@@ -140,7 +140,16 @@ function verifyUser(email, code) {
   const user = findUserByEmail(email);
   if (!user) return { success: false, message: 'Benutzer nicht gefunden' };
   if (user.verified === 1) return { success: false, message: 'Bereits verifiziert' };
-  if (user.verification_code !== code) return { success: false, message: 'Falscher Code' };
+  
+  // String-Vergleich (beide als String)
+  const storedCode = String(user.verification_code || '');
+  const inputCode = String(code || '').trim();
+  
+  console.log(`Verify: stored="${storedCode}", input="${inputCode}"`);
+  
+  if (storedCode !== inputCode) {
+    return { success: false, message: 'Falscher Code' };
+  }
   
   // Verifizieren
   const stmt = db.prepare('UPDATE users SET verified = 1, verification_code = NULL WHERE email = ?');
