@@ -41,6 +41,8 @@ async function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      verified INTEGER NOT NULL DEFAULT 0,
+      verification_code TEXT,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
     )
   `);
@@ -96,9 +98,9 @@ function getDb() {
 
 // ==================== User-Funktionen ====================
 
-function createUser(email, passwordHash) {
-  const stmt = db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)');
-  stmt.run([email, passwordHash]);
+function createUser(email, passwordHash, verificationCode) {
+  const stmt = db.prepare('INSERT INTO users (email, password_hash, verified, verification_code) VALUES (?, ?, 0, ?)');
+  stmt.run([email, passwordHash, verificationCode]);
   stmt.free();
   saveDatabase();
   
@@ -121,7 +123,7 @@ function findUserByEmail(email) {
 }
 
 function findUserById(id) {
-  const stmt = db.prepare('SELECT id, email, created_at FROM users WHERE id = ?');
+  const stmt = db.prepare('SELECT id, email, verified, created_at FROM users WHERE id = ?');
   stmt.bind([id]);
   
   if (stmt.step()) {
@@ -131,6 +133,29 @@ function findUserById(id) {
   }
   stmt.free();
   return null;
+}
+
+function verifyUser(email, code) {
+  // Prüfe ob Code stimmt
+  const user = findUserByEmail(email);
+  if (!user) return { success: false, message: 'Benutzer nicht gefunden' };
+  if (user.verified === 1) return { success: false, message: 'Bereits verifiziert' };
+  if (user.verification_code !== code) return { success: false, message: 'Falscher Code' };
+  
+  // Verifizieren
+  const stmt = db.prepare('UPDATE users SET verified = 1, verification_code = NULL WHERE email = ?');
+  stmt.run([email]);
+  stmt.free();
+  saveDatabase();
+  
+  return { success: true, user };
+}
+
+function updateVerificationCode(email, newCode) {
+  const stmt = db.prepare('UPDATE users SET verification_code = ? WHERE email = ?');
+  stmt.run([newCode, email]);
+  stmt.free();
+  saveDatabase();
 }
 
 // ==================== Poll-Funktionen ====================
@@ -237,6 +262,8 @@ module.exports = {
   createUser,
   findUserByEmail,
   findUserById,
+  verifyUser,
+  updateVerificationCode,
   // Polls
   getAllPolls,
   getPollById,

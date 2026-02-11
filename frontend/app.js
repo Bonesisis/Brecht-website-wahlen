@@ -34,7 +34,20 @@ const api = {
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Registrierung fehlgeschlagen");
+    if (!res.ok && !data.requiresVerification) {
+      throw new Error(data.message || "Registrierung fehlgeschlagen");
+    }
+    return data;
+  },
+
+  async verify(email, code) {
+    const res = await fetch(`${API_BASE}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Bestätigung fehlgeschlagen");
     return data;
   },
 
@@ -45,7 +58,10 @@ const api = {
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Login fehlgeschlagen");
+    // Bei requiresVerification nicht als Fehler werfen
+    if (!res.ok && !data.requiresVerification) {
+      throw new Error(data.message || "Login fehlgeschlagen");
+    }
     return data;
   },
 
@@ -340,8 +356,19 @@ function initRegister() {
 
     try {
       const data = await api.register(email, password);
-      saveUser(data.token, data.user.email, data.user.id);
-      window.location.href = "./polls.html";
+      
+      // Weiterleitung zur Bestätigungsseite
+      if (data.requiresVerification) {
+        localStorage.setItem("bw_pendingEmail", data.email);
+        window.location.href = "./verify.html";
+        return;
+      }
+      
+      // Falls direkt eingeloggt (sollte nicht mehr passieren)
+      if (data.token) {
+        saveUser(data.token, data.user.email, data.user.id);
+        window.location.href = "./polls.html";
+      }
     } catch (error) {
       showAlert(card, error.message);
     }
@@ -374,6 +401,17 @@ function initLogin() {
 
     try {
       const data = await api.login(email, password);
+      
+      // Falls Verifizierung nötig
+      if (data.requiresVerification) {
+        localStorage.setItem("bw_pendingEmail", data.email);
+        showAlert(card, data.message, "info");
+        setTimeout(() => {
+          window.location.href = "./verify.html";
+        }, 1500);
+        return;
+      }
+      
       saveUser(data.token, data.user.email, data.user.id);
       window.location.href = "./polls.html";
     } catch (error) {
@@ -386,6 +424,63 @@ function initLogin() {
   // Remove error styling on input
   emailInput.addEventListener("input", () => emailInput.classList.remove("input--error"));
   passwordInput.addEventListener("input", () => passwordInput.classList.remove("input--error"));
+}
+
+// ==================== Page: Verify ====================
+function initVerify() {
+  const form = document.querySelector("[data-verify-form]");
+  const emailInput = document.querySelector("[data-verify-email]");
+  const codeInput = document.querySelector("[data-verify-code]");
+  const card = document.querySelector("[data-verify-card]");
+  const resendBtn = document.querySelector("[data-resend]");
+  
+  if (!form) return;
+
+  // E-Mail aus localStorage laden
+  const pendingEmail = localStorage.getItem("bw_pendingEmail");
+  if (!pendingEmail) {
+    window.location.href = "./register.html";
+    return;
+  }
+  
+  emailInput.value = pendingEmail;
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const code = codeInput.value.trim();
+
+    if (code.length !== 6) {
+      showAlert(card, "Bitte gib den 6-stelligen Code ein.");
+      codeInput.classList.add("input--error");
+      return;
+    }
+
+    try {
+      const data = await api.verify(pendingEmail, code);
+      localStorage.removeItem("bw_pendingEmail");
+      saveUser(data.token, data.user.email, data.user.id);
+      showAlert(card, "E-Mail erfolgreich bestätigt!", "success");
+      setTimeout(() => {
+        window.location.href = "./polls.html";
+      }, 1000);
+    } catch (error) {
+      showAlert(card, error.message);
+      codeInput.classList.add("input--error");
+    }
+  });
+
+  // Code erneut senden
+  resendBtn.addEventListener("click", async () => {
+    try {
+      // Erneute Registrierung triggert neuen Code
+      await api.register(pendingEmail, "dummy-resend");
+      showAlert(card, "Neuer Code wurde gesendet. Schau in die Server-Konsole.", "success");
+    } catch (error) {
+      showAlert(card, "Neuer Code wurde gesendet. Schau in die Server-Konsole.", "success");
+    }
+  });
+
+  codeInput.addEventListener("input", () => codeInput.classList.remove("input--error"));
 }
 
 // ==================== Page: Polls ====================
@@ -642,6 +737,7 @@ const page = document.body?.dataset.page;
 if (page === "index") initIndex();
 if (page === "register") initRegister();
 if (page === "login") initLogin();
+if (page === "verify") initVerify();
 if (page === "polls") initPolls();
 if (page === "vote") initVote();
 if (page === "admin") initAdmin();

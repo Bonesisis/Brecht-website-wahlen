@@ -68,11 +68,17 @@ if (SERVE_FRONTEND) {
   console.log(`✓ Frontend wird ausgeliefert von: ${frontendPath}`);
 }
 
+// ==================== Helper ====================
+
+function generateVerificationCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 // ==================== Auth Endpoints ====================
 
 /**
  * POST /api/register
- * Neuen Account erstellen
+ * Neuen Account erstellen (noch nicht verifiziert)
  */
 app.post('/api/register', async (req, res) => {
   try {
@@ -105,28 +111,51 @@ app.post('/api/register', async (req, res) => {
     // Prüfen ob E-Mail bereits existiert
     const existingUser = db.findUserByEmail(email.toLowerCase().trim());
     if (existingUser) {
+      // Falls nicht verifiziert, neuen Code senden
+      if (existingUser.verified === 0) {
+        const newCode = generateVerificationCode();
+        db.updateVerificationCode(email.toLowerCase().trim(), newCode);
+        
+        console.log('');
+        console.log('═══════════════════════════════════════════════');
+        console.log(`  BESTÄTIGUNGSCODE für ${email}`);
+        console.log(`  Code: ${newCode}`);
+        console.log('═══════════════════════════════════════════════');
+        console.log('');
+        
+        return res.status(200).json({ 
+          message: 'Neuer Bestätigungscode gesendet',
+          requiresVerification: true,
+          email: email.toLowerCase().trim()
+        });
+      }
       return res.status(409).json({ 
         error: 'E-Mail bereits registriert',
         message: 'Diese E-Mail ist bereits registriert. Bitte melde dich an.' 
       });
     }
 
+    // Bestätigungscode generieren
+    const verificationCode = generateVerificationCode();
+
     // Passwort hashen
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-    // User erstellen
-    const userId = db.createUser(email.toLowerCase().trim(), passwordHash);
+    // User erstellen (noch nicht verifiziert)
+    const userId = db.createUser(email.toLowerCase().trim(), passwordHash, verificationCode);
 
-    // Token generieren
-    const token = auth.generateToken({ 
-      user_id: userId, 
-      email: email.toLowerCase().trim() 
-    });
+    // Code in Konsole ausgeben (in Produktion: E-Mail senden)
+    console.log('');
+    console.log('═══════════════════════════════════════════════');
+    console.log(`  BESTÄTIGUNGSCODE für ${email}`);
+    console.log(`  Code: ${verificationCode}`);
+    console.log('═══════════════════════════════════════════════');
+    console.log('');
 
     res.status(201).json({ 
-      message: 'Registrierung erfolgreich',
-      token,
-      user: { id: userId, email: email.toLowerCase().trim() }
+      message: 'Registrierung erfolgreich. Bitte bestätige deine E-Mail.',
+      requiresVerification: true,
+      email: email.toLowerCase().trim()
     });
 
   } catch (error) {
@@ -134,6 +163,51 @@ app.post('/api/register', async (req, res) => {
     res.status(500).json({ 
       error: 'Serverfehler',
       message: 'Registrierung fehlgeschlagen' 
+    });
+  }
+});
+
+/**
+ * POST /api/verify
+ * E-Mail mit Code bestätigen
+ */
+app.post('/api/verify', async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'E-Mail und Code sind erforderlich' 
+      });
+    }
+
+    const result = db.verifyUser(email.toLowerCase().trim(), code);
+    
+    if (!result.success) {
+      return res.status(400).json({ 
+        error: 'Verifizierung fehlgeschlagen',
+        message: result.message 
+      });
+    }
+
+    // Token generieren
+    const token = auth.generateToken({ 
+      user_id: result.user.id, 
+      email: result.user.email 
+    });
+
+    res.json({ 
+      message: 'E-Mail erfolgreich bestätigt',
+      token,
+      user: { id: result.user.id, email: result.user.email }
+    });
+
+  } catch (error) {
+    console.error('Verify-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Verifizierung fehlgeschlagen' 
     });
   }
 });
@@ -160,6 +234,27 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ 
         error: 'Login fehlgeschlagen',
         message: 'E-Mail oder Passwort falsch' 
+      });
+    }
+
+    // Prüfen ob verifiziert
+    if (user.verified !== 1) {
+      // Neuen Code senden
+      const newCode = generateVerificationCode();
+      db.updateVerificationCode(email.toLowerCase().trim(), newCode);
+      
+      console.log('');
+      console.log('═══════════════════════════════════════════════');
+      console.log(`  BESTÄTIGUNGSCODE für ${email}`);
+      console.log(`  Code: ${newCode}`);
+      console.log('═══════════════════════════════════════════════');
+      console.log('');
+      
+      return res.status(403).json({ 
+        error: 'Nicht verifiziert',
+        message: 'Bitte bestätige zuerst deine E-Mail. Ein neuer Code wurde gesendet.',
+        requiresVerification: true,
+        email: user.email
       });
     }
 
