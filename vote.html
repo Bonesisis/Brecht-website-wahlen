@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brecht Abstimmungen · Abstimmen</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="vote">
+  <div class="container">
+    <header class="header">
+      <div class="brand">
+        <div class="brand__badge">BS</div>
+        <div>
+          <div class="brand__title">Abstimmung</div>
+          <p class="helper">Stimme ab und sieh das Ergebnis</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="polls.html">Abstimmungen</a>
+        <a href="admin.html">Admin</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <div class="flex">
+        <div>
+          <h1 data-poll-title></h1>
+          <p data-poll-question></p>
+        </div>
+        <span data-poll-status class="badge"></span>
+      </div>
+
+      <div data-vote-section class="grid grid--2" style="margin-top: 18px;">
+        <button class="button" data-vote="yes">Ja</button>
+        <button class="button button--ghost" data-vote="no">Nein</button>
+      </div>
+
+      <div data-result-section class="hidden" style="margin-top: 20px;">
+        <div class="flex" style="margin-bottom: 12px;">
+          <h3>Ergebnis</h3>
+          <span class="helper" data-result-info></span>
+        </div>
+        <div style="margin-bottom: 12px;">
+          <div class="flex">
+            <span class="helper" data-yes-percent></span>
+          </div>
+          <div class="progress">
+            <div class="progress__bar" data-yes-bar></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex">
+            <span class="helper" data-no-percent></span>
+          </div>
+          <div class="progress">
+            <div class="progress__bar" data-no-bar style="background: var(--green-200);"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <a class="button button--ghost" href="polls.html">Zurück zur Übersicht</a>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

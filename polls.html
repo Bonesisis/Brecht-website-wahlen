@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brecht Abstimmungen · Übersicht</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="polls">
+  <div class="container">
+    <header class="header">
+      <div class="brand">
+        <div class="brand__badge">BS</div>
+        <div>
+          <div class="brand__title">Abstimmungsübersicht</div>
+          <p class="helper">Aktive und geschlossene Abstimmungen</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="polls.html">Abstimmungen</a>
+        <a href="admin.html">Admin</a>
+        <a href="index.html">Login</a>
+      </nav>
+    </header>
+
+    <section class="card card--soft">
+      <h2>So funktioniert es</h2>
+      <p>Wähle eine Abstimmung aus. Pro Person ist nur eine Stimme möglich. Ergebnisse siehst du direkt nach deiner Stimme.</p>
+    </section>
+
+    <section class="grid" data-poll-list></section>
+
+    <div class="footer">Mock-Version ohne Backend · Daten werden lokal gespeichert.</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brecht Abstimmungen · Admin</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="admin">
+  <div class="container">
+    <header class="header">
+      <div class="brand">
+        <div class="brand__badge">BS</div>
+        <div>
+          <div class="brand__title">Admin-Bereich</div>
+          <p class="helper">Abstimmungen verwalten und kontrollieren</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="polls.html">Abstimmungen</a>
+        <a href="index.html">Login</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <h2>Neue Abstimmung erstellen</h2>
+      <form class="grid" data-admin-form>
+        <label>
+          <span class="helper">Titel</span>
+          <input class="input" type="text" placeholder="Kurzer Titel" data-admin-title required />
+        </label>
+        <label>
+          <span class="helper">Frage</span>
+          <input class="input" type="text" placeholder="Abstimmungsfrage" data-admin-question required />
+        </label>
+        <button class="button" type="submit">Abstimmung anlegen</button>
+      </form>
+    </section>
+
+    <section class="grid" data-admin-list></section>
+
+    <div class="footer">Admin-Änderungen werden lokal gespeichert.</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

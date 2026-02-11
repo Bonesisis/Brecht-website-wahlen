@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brecht Abstimmungen · Login</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="login">
+  <div class="container">
+    <header class="header">
+      <div class="brand">
+        <div class="brand__badge">BS</div>
+        <div>
+          <div class="brand__title">Brecht Schule Hamburg</div>
+          <p class="helper">Digitale Abstimmungsplattform</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="polls.html">Abstimmungen</a>
+        <a href="admin.html">Admin</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <h1>Willkommen zur Abstimmung</h1>
+      <p>Bitte gib deinen Namen ein, um an den Abstimmungen teilnehmen zu können.</p>
+      <form data-login-form class="grid">
+        <label>
+          <span class="helper">Name</span>
+          <input class="input" type="text" placeholder="Vorname Nachname" data-login-input required />
+        </label>
+        <button class="button" type="submit">Weiter zur Übersicht</button>
+      </form>
+    </section>
+
+    <section class="card card--soft">
+      <h2>Hinweis</h2>
+      <p>Diese Version läuft vollständig im Browser und speichert Daten lokal. Später kann das System nahtlos auf ein echtes Backend umgestellt werden.</p>
+    </section>
+
+    <div class="footer">Stand: 11. Februar 2026 · Mock-Version</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
