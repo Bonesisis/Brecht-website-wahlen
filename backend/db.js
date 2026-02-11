@@ -1,27 +1,42 @@
 /**
  * Brechtwahl Backend - Datenbank-Modul
  * 
- * SQLite-Datenbank mit better-sqlite3 (synchron, schnell, portabel)
+ * SQLite-Datenbank mit sql.js (pure JavaScript, keine native Kompilierung)
  */
 
-const Database = require('better-sqlite3');
+const initSqlJs = require('sql.js');
+const fs = require('fs');
 const path = require('path');
 
 // Datenbank-Datei im backend-Ordner
 const DB_PATH = path.join(__dirname, 'db.sqlite');
 
-// Datenbank-Verbindung erstellen
-const db = new Database(DB_PATH);
-
-// WAL-Modus für bessere Performance
-db.pragma('journal_mode = WAL');
+// Globale Datenbank-Instanz
+let db = null;
 
 /**
- * Datenbank-Schema initialisieren
+ * Datenbank initialisieren (async!)
  */
-function initDatabase() {
-  // Users-Tabelle
-  db.exec(`
+async function initDatabase() {
+  const SQL = await initSqlJs();
+  
+  // Versuche existierende DB zu laden
+  try {
+    if (fs.existsSync(DB_PATH)) {
+      const fileBuffer = fs.readFileSync(DB_PATH);
+      db = new SQL.Database(fileBuffer);
+      console.log('✓ Existierende Datenbank geladen');
+    } else {
+      db = new SQL.Database();
+      console.log('✓ Neue Datenbank erstellt');
+    }
+  } catch (error) {
+    db = new SQL.Database();
+    console.log('✓ Neue Datenbank erstellt (Fehler beim Laden)');
+  }
+
+  // Schema erstellen
+  db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
@@ -30,8 +45,7 @@ function initDatabase() {
     )
   `);
 
-  // Polls-Tabelle
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS polls (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -40,126 +54,185 @@ function initDatabase() {
     )
   `);
 
-  // Votes-Tabelle mit Unique Constraint (1 Vote pro User pro Poll)
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS votes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       poll_id TEXT NOT NULL,
       user_id INTEGER NOT NULL,
       choice TEXT NOT NULL CHECK(choice IN ('yes', 'no')),
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-      UNIQUE(poll_id, user_id),
-      FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      UNIQUE(poll_id, user_id)
     )
   `);
 
-  // Index für schnellere Abfragen
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_votes_poll ON votes(poll_id)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_votes_user ON votes(user_id)`);
+  // Indizes
+  db.run(`CREATE INDEX IF NOT EXISTS idx_votes_poll ON votes(poll_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_votes_user ON votes(user_id)`);
 
-  console.log('✓ Datenbank initialisiert');
+  // Speichern
+  saveDatabase();
+  
+  console.log('✓ Datenbank-Schema initialisiert');
+  return db;
+}
+
+/**
+ * Datenbank auf Disk speichern
+ */
+function saveDatabase() {
+  if (!db) return;
+  const data = db.export();
+  const buffer = Buffer.from(data);
+  fs.writeFileSync(DB_PATH, buffer);
+}
+
+/**
+ * Datenbank-Instanz abrufen
+ */
+function getDb() {
+  if (!db) throw new Error('Datenbank nicht initialisiert');
+  return db;
 }
 
 // ==================== User-Funktionen ====================
 
-/**
- * Neuen User erstellen
- */
-const createUser = db.prepare(`
-  INSERT INTO users (email, password_hash) VALUES (?, ?)
-`);
+function createUser(email, passwordHash) {
+  const stmt = db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)');
+  stmt.run([email, passwordHash]);
+  stmt.free();
+  saveDatabase();
+  
+  // ID des neuen Users abrufen
+  const result = db.exec('SELECT last_insert_rowid() as id');
+  return result[0].values[0][0];
+}
 
-/**
- * User per Email finden
- */
-const findUserByEmail = db.prepare(`
-  SELECT * FROM users WHERE email = ?
-`);
+function findUserByEmail(email) {
+  const stmt = db.prepare('SELECT * FROM users WHERE email = ?');
+  stmt.bind([email]);
+  
+  if (stmt.step()) {
+    const row = stmt.getAsObject();
+    stmt.free();
+    return row;
+  }
+  stmt.free();
+  return null;
+}
 
-/**
- * User per ID finden
- */
-const findUserById = db.prepare(`
-  SELECT id, email, created_at FROM users WHERE id = ?
-`);
+function findUserById(id) {
+  const stmt = db.prepare('SELECT id, email, created_at FROM users WHERE id = ?');
+  stmt.bind([id]);
+  
+  if (stmt.step()) {
+    const row = stmt.getAsObject();
+    stmt.free();
+    return row;
+  }
+  stmt.free();
+  return null;
+}
 
 // ==================== Poll-Funktionen ====================
 
-/**
- * Alle Polls abrufen (nur id, title, active)
- */
-const getAllPolls = db.prepare(`
-  SELECT id, title, active FROM polls ORDER BY created_at DESC
-`);
+function getAllPolls() {
+  const result = db.exec('SELECT id, title, active FROM polls ORDER BY created_at DESC');
+  if (!result.length) return [];
+  
+  return result[0].values.map(row => ({
+    id: row[0],
+    title: row[1],
+    active: row[2]
+  }));
+}
 
-/**
- * Einzelnen Poll per ID abrufen
- */
-const getPollById = db.prepare(`
-  SELECT id, title, active, created_at FROM polls WHERE id = ?
-`);
+function getPollById(id) {
+  const stmt = db.prepare('SELECT id, title, active, created_at FROM polls WHERE id = ?');
+  stmt.bind([id]);
+  
+  if (stmt.step()) {
+    const row = stmt.getAsObject();
+    stmt.free();
+    return row;
+  }
+  stmt.free();
+  return null;
+}
 
-/**
- * Neuen Poll erstellen
- */
-const createPoll = db.prepare(`
-  INSERT INTO polls (id, title, active) VALUES (?, ?, ?)
-`);
+function createPoll(id, title, active) {
+  const stmt = db.prepare('INSERT INTO polls (id, title, active) VALUES (?, ?, ?)');
+  stmt.run([id, title, active ? 1 : 0]);
+  stmt.free();
+  saveDatabase();
+}
 
-/**
- * Poll aktualisieren (active status)
- */
-const updatePoll = db.prepare(`
-  UPDATE polls SET active = ? WHERE id = ?
-`);
+function updatePoll(id, active) {
+  const stmt = db.prepare('UPDATE polls SET active = ? WHERE id = ?');
+  stmt.run([active ? 1 : 0, id]);
+  stmt.free();
+  saveDatabase();
+}
 
-/**
- * Poll löschen
- */
-const deletePoll = db.prepare(`
-  DELETE FROM polls WHERE id = ?
-`);
+function deletePoll(id) {
+  const stmt = db.prepare('DELETE FROM polls WHERE id = ?');
+  stmt.run([id]);
+  stmt.free();
+  saveDatabase();
+}
 
 // ==================== Vote-Funktionen ====================
 
-/**
- * Vote abgeben
- */
-const createVote = db.prepare(`
-  INSERT INTO votes (poll_id, user_id, choice) VALUES (?, ?, ?)
-`);
+function createVote(pollId, userId, choice) {
+  const stmt = db.prepare('INSERT INTO votes (poll_id, user_id, choice) VALUES (?, ?, ?)');
+  stmt.run([pollId, userId, choice]);
+  stmt.free();
+  saveDatabase();
+}
 
-/**
- * Prüfen ob User bereits gevoted hat
- */
-const hasUserVoted = db.prepare(`
-  SELECT id FROM votes WHERE poll_id = ? AND user_id = ?
-`);
+function hasUserVoted(pollId, userId) {
+  const stmt = db.prepare('SELECT id FROM votes WHERE poll_id = ? AND user_id = ?');
+  stmt.bind([pollId, userId]);
+  const hasVote = stmt.step();
+  stmt.free();
+  return hasVote;
+}
 
-/**
- * Ergebnisse für einen Poll abrufen
- */
-const getResults = db.prepare(`
-  SELECT 
-    COUNT(*) as total,
-    SUM(CASE WHEN choice = 'yes' THEN 1 ELSE 0 END) as yes,
-    SUM(CASE WHEN choice = 'no' THEN 1 ELSE 0 END) as no
-  FROM votes 
-  WHERE poll_id = ?
-`);
+function getResults(pollId) {
+  const stmt = db.prepare(`
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN choice = 'yes' THEN 1 ELSE 0 END) as yes,
+      SUM(CASE WHEN choice = 'no' THEN 1 ELSE 0 END) as no
+    FROM votes 
+    WHERE poll_id = ?
+  `);
+  stmt.bind([pollId]);
+  
+  if (stmt.step()) {
+    const row = stmt.getAsObject();
+    stmt.free();
+    return {
+      total: row.total || 0,
+      yes: row.yes || 0,
+      no: row.no || 0
+    };
+  }
+  stmt.free();
+  return { total: 0, yes: 0, no: 0 };
+}
 
-/**
- * Alle Votes für einen Poll löschen (Admin-Funktion)
- */
-const resetVotes = db.prepare(`
-  DELETE FROM votes WHERE poll_id = ?
-`);
+function resetVotes(pollId) {
+  const stmt = db.prepare('DELETE FROM votes WHERE poll_id = ?');
+  stmt.run([pollId]);
+  stmt.free();
+  saveDatabase();
+}
 
 // Exportieren
 module.exports = {
-  db,
   initDatabase,
+  getDb,
+  saveDatabase,
   // Users
   createUser,
   findUserByEmail,

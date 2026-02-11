@@ -23,7 +23,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
@@ -63,7 +63,7 @@ app.use((req, res, next) => {
 // ==================== Static Frontend (optional) ====================
 
 if (SERVE_FRONTEND) {
-  const frontendPath = path.join(__dirname, '..'); // Parent-Ordner
+  const frontendPath = path.join(__dirname, '..', 'frontend');
   app.use(express.static(frontendPath));
   console.log(`✓ Frontend wird ausgeliefert von: ${frontendPath}`);
 }
@@ -103,7 +103,7 @@ app.post('/api/register', async (req, res) => {
     }
 
     // Prüfen ob E-Mail bereits existiert
-    const existingUser = db.findUserByEmail.get(email.toLowerCase().trim());
+    const existingUser = db.findUserByEmail(email.toLowerCase().trim());
     if (existingUser) {
       return res.status(409).json({ 
         error: 'E-Mail bereits registriert',
@@ -115,8 +115,7 @@ app.post('/api/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     // User erstellen
-    const result = db.createUser.run(email.toLowerCase().trim(), passwordHash);
-    const userId = result.lastInsertRowid;
+    const userId = db.createUser(email.toLowerCase().trim(), passwordHash);
 
     // Token generieren
     const token = auth.generateToken({ 
@@ -156,7 +155,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     // User suchen
-    const user = db.findUserByEmail.get(email.toLowerCase().trim());
+    const user = db.findUserByEmail(email.toLowerCase().trim());
     if (!user) {
       return res.status(401).json({ 
         error: 'Login fehlgeschlagen',
@@ -202,7 +201,7 @@ app.post('/api/login', async (req, res) => {
  */
 app.get('/api/polls', (req, res) => {
   try {
-    const polls = db.getAllPolls.all();
+    const polls = db.getAllPolls();
     
     // active von Integer zu Boolean konvertieren
     const formattedPolls = polls.map(poll => ({
@@ -226,7 +225,7 @@ app.get('/api/polls', (req, res) => {
  */
 app.get('/api/polls/:id', (req, res) => {
   try {
-    const poll = db.getPollById.get(req.params.id);
+    const poll = db.getPollById(req.params.id);
     
     if (!poll) {
       return res.status(404).json({ 
@@ -275,7 +274,7 @@ app.post('/api/vote', auth.authRequired, (req, res) => {
     }
 
     // Poll prüfen
-    const poll = db.getPollById.get(poll_id);
+    const poll = db.getPollById(poll_id);
     if (!poll) {
       return res.status(404).json({ 
         error: 'Nicht gefunden',
@@ -291,8 +290,7 @@ app.post('/api/vote', auth.authRequired, (req, res) => {
     }
 
     // Prüfen ob User bereits abgestimmt hat
-    const existingVote = db.hasUserVoted.get(poll_id, userId);
-    if (existingVote) {
+    if (db.hasUserVoted(poll_id, userId)) {
       return res.status(409).json({ 
         error: 'Bereits abgestimmt',
         message: 'Du hast bereits an dieser Abstimmung teilgenommen' 
@@ -300,7 +298,7 @@ app.post('/api/vote', auth.authRequired, (req, res) => {
     }
 
     // Vote speichern
-    db.createVote.run(poll_id, userId, choice);
+    db.createVote(poll_id, userId, choice);
 
     res.status(201).json({ 
       message: 'Stimme erfolgreich abgegeben',
@@ -332,7 +330,7 @@ app.get('/api/results', (req, res) => {
     }
 
     // Poll prüfen
-    const poll = db.getPollById.get(poll_id);
+    const poll = db.getPollById(poll_id);
     if (!poll) {
       return res.status(404).json({ 
         error: 'Nicht gefunden',
@@ -341,7 +339,7 @@ app.get('/api/results', (req, res) => {
     }
 
     // Ergebnisse abrufen
-    const results = db.getResults.get(poll_id);
+    const results = db.getResults(poll_id);
 
     res.json({
       poll_id,
@@ -377,9 +375,9 @@ app.post('/api/admin/polls', auth.adminRequired, (req, res) => {
     }
 
     const pollId = uuidv4();
-    db.createPoll.run(pollId, title.trim(), active ? 1 : 0);
+    db.createPoll(pollId, title.trim(), active);
 
-    const poll = db.getPollById.get(pollId);
+    const poll = db.getPollById(pollId);
 
     res.status(201).json({
       message: 'Abstimmung erstellt',
@@ -408,7 +406,7 @@ app.patch('/api/admin/polls/:id', auth.adminRequired, (req, res) => {
     const { active } = req.body;
 
     // Poll prüfen
-    const poll = db.getPollById.get(id);
+    const poll = db.getPollById(id);
     if (!poll) {
       return res.status(404).json({ 
         error: 'Nicht gefunden',
@@ -424,9 +422,9 @@ app.patch('/api/admin/polls/:id', auth.adminRequired, (req, res) => {
     }
 
     // Aktualisieren
-    db.updatePoll.run(active ? 1 : 0, id);
+    db.updatePoll(id, active);
     
-    const updatedPoll = db.getPollById.get(id);
+    const updatedPoll = db.getPollById(id);
 
     res.json({
       message: 'Abstimmung aktualisiert',
@@ -454,7 +452,7 @@ app.delete('/api/admin/polls/:id', auth.adminRequired, (req, res) => {
     const { id } = req.params;
 
     // Poll prüfen
-    const poll = db.getPollById.get(id);
+    const poll = db.getPollById(id);
     if (!poll) {
       return res.status(404).json({ 
         error: 'Nicht gefunden',
@@ -463,8 +461,8 @@ app.delete('/api/admin/polls/:id', auth.adminRequired, (req, res) => {
     }
 
     // Votes und Poll löschen
-    db.resetVotes.run(id);
-    db.deletePoll.run(id);
+    db.resetVotes(id);
+    db.deletePoll(id);
 
     res.json({ 
       message: 'Abstimmung gelöscht',
@@ -495,7 +493,7 @@ app.get('/api/admin/results', auth.adminRequired, (req, res) => {
       });
     }
 
-    const poll = db.getPollById.get(poll_id);
+    const poll = db.getPollById(poll_id);
     if (!poll) {
       return res.status(404).json({ 
         error: 'Nicht gefunden',
@@ -503,7 +501,7 @@ app.get('/api/admin/results', auth.adminRequired, (req, res) => {
       });
     }
 
-    const results = db.getResults.get(poll_id);
+    const results = db.getResults(poll_id);
 
     res.json({
       poll_id,
@@ -542,19 +540,26 @@ app.use('/api/*', (req, res) => {
 
 // ==================== Server starten ====================
 
-// Datenbank initialisieren
-db.initDatabase();
+// Server starten (nach DB-Init)
+async function startServer() {
+  // Datenbank initialisieren (async mit sql.js)
+  await db.initDatabase();
 
-// Server starten
-app.listen(PORT, () => {
-  console.log('');
-  console.log('╔════════════════════════════════════════════╗');
-  console.log('║       Brechtwahl Backend gestartet         ║');
-  console.log('╚════════════════════════════════════════════╝');
-  console.log('');
-  console.log(`✓ Server läuft auf Port ${PORT}`);
-  console.log(`✓ API-Basis: http://localhost:${PORT}/api`);
-  console.log(`✓ CORS: ${CORS_ORIGIN}`);
-  console.log(`✓ Frontend-Serving: ${SERVE_FRONTEND ? 'aktiviert' : 'deaktiviert'}`);
-  console.log('');
+  app.listen(PORT, () => {
+    console.log('');
+    console.log('╔════════════════════════════════════════════╗');
+    console.log('║       Brechtwahl Backend gestartet         ║');
+    console.log('╚════════════════════════════════════════════╝');
+    console.log('');
+    console.log(`✓ Server läuft auf Port ${PORT}`);
+    console.log(`✓ API-Basis: http://localhost:${PORT}/api`);
+    console.log(`✓ CORS: ${CORS_ORIGIN}`);
+    console.log(`✓ Frontend-Serving: ${SERVE_FRONTEND ? 'aktiviert' : 'deaktiviert'}`);
+    console.log('');
+  });
+}
+
+startServer().catch(err => {
+  console.error('Fehler beim Starten:', err);
+  process.exit(1);
 });
