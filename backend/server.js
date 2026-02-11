@@ -1,0 +1,560 @@
+/**
+ * Brechtwahl Backend - Server
+ * 
+ * Express-Server mit REST-API für die Abstimmungsplattform
+ * 
+ * Endpoints:
+ * - POST /api/register     - Neuen Account erstellen
+ * - POST /api/login        - Einloggen und Token erhalten
+ * - GET  /api/polls        - Alle Abstimmungen abrufen
+ * - GET  /api/polls/:id    - Einzelne Abstimmung abrufen
+ * - POST /api/vote         - Abstimmen (Auth required)
+ * - GET  /api/results      - Ergebnisse abrufen
+ * 
+ * Admin-Endpoints (X-Admin-Code Header required):
+ * - POST   /api/admin/polls      - Neue Abstimmung erstellen
+ * - PATCH  /api/admin/polls/:id  - Abstimmung aktualisieren
+ * - DELETE /api/admin/polls/:id  - Abstimmung löschen
+ * - GET    /api/admin/results    - Ergebnisse abrufen (Admin)
+ */
+
+// Umgebungsvariablen laden
+require('dotenv').config();
+
+const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+
+// Eigene Module
+const db = require('./db');
+const auth = require('./auth');
+
+// Express-App erstellen
+const app = express();
+
+// ==================== Konfiguration ====================
+
+const PORT = process.env.PORT || 3000;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+const SERVE_FRONTEND = process.env.SERVE_FRONTEND === 'true';
+const BCRYPT_ROUNDS = 10;
+
+// ==================== Middleware ====================
+
+// JSON-Body parsen
+app.use(express.json());
+
+// CORS konfigurieren
+app.use(cors({
+  origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
+  credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Code']
+}));
+
+// Request-Logging (einfach)
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
+  next();
+});
+
+// ==================== Static Frontend (optional) ====================
+
+if (SERVE_FRONTEND) {
+  const frontendPath = path.join(__dirname, '..'); // Parent-Ordner
+  app.use(express.static(frontendPath));
+  console.log(`✓ Frontend wird ausgeliefert von: ${frontendPath}`);
+}
+
+// ==================== Auth Endpoints ====================
+
+/**
+ * POST /api/register
+ * Neuen Account erstellen
+ */
+app.post('/api/register', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validierung
+    if (!email || !password) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'E-Mail und Passwort sind erforderlich' 
+      });
+    }
+
+    // E-Mail-Format prüfen (nur @brecht-schulen.de mit Punkt vor @)
+    if (!auth.isValidSchoolEmail(email)) {
+      return res.status(400).json({ 
+        error: 'Ungültige E-Mail',
+        message: 'Bitte nutze deine Schul-E-Mail im Format vorname.nachname@brecht-schulen.de' 
+      });
+    }
+
+    // Passwort-Länge prüfen
+    if (password.length < 4) {
+      return res.status(400).json({ 
+        error: 'Passwort zu kurz',
+        message: 'Das Passwort muss mindestens 4 Zeichen haben' 
+      });
+    }
+
+    // Prüfen ob E-Mail bereits existiert
+    const existingUser = db.findUserByEmail.get(email.toLowerCase().trim());
+    if (existingUser) {
+      return res.status(409).json({ 
+        error: 'E-Mail bereits registriert',
+        message: 'Diese E-Mail ist bereits registriert. Bitte melde dich an.' 
+      });
+    }
+
+    // Passwort hashen
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+
+    // User erstellen
+    const result = db.createUser.run(email.toLowerCase().trim(), passwordHash);
+    const userId = result.lastInsertRowid;
+
+    // Token generieren
+    const token = auth.generateToken({ 
+      user_id: userId, 
+      email: email.toLowerCase().trim() 
+    });
+
+    res.status(201).json({ 
+      message: 'Registrierung erfolgreich',
+      token,
+      user: { id: userId, email: email.toLowerCase().trim() }
+    });
+
+  } catch (error) {
+    console.error('Register-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Registrierung fehlgeschlagen' 
+    });
+  }
+});
+
+/**
+ * POST /api/login
+ * Einloggen und Token erhalten
+ */
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validierung
+    if (!email || !password) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'E-Mail und Passwort sind erforderlich' 
+      });
+    }
+
+    // User suchen
+    const user = db.findUserByEmail.get(email.toLowerCase().trim());
+    if (!user) {
+      return res.status(401).json({ 
+        error: 'Login fehlgeschlagen',
+        message: 'E-Mail oder Passwort falsch' 
+      });
+    }
+
+    // Passwort prüfen
+    const passwordValid = await bcrypt.compare(password, user.password_hash);
+    if (!passwordValid) {
+      return res.status(401).json({ 
+        error: 'Login fehlgeschlagen',
+        message: 'E-Mail oder Passwort falsch' 
+      });
+    }
+
+    // Token generieren
+    const token = auth.generateToken({ 
+      user_id: user.id, 
+      email: user.email 
+    });
+
+    res.json({ 
+      message: 'Login erfolgreich',
+      token,
+      user: { id: user.id, email: user.email }
+    });
+
+  } catch (error) {
+    console.error('Login-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Login fehlgeschlagen' 
+    });
+  }
+});
+
+// ==================== Poll Endpoints ====================
+
+/**
+ * GET /api/polls
+ * Alle Abstimmungen abrufen
+ */
+app.get('/api/polls', (req, res) => {
+  try {
+    const polls = db.getAllPolls.all();
+    
+    // active von Integer zu Boolean konvertieren
+    const formattedPolls = polls.map(poll => ({
+      ...poll,
+      active: poll.active === 1
+    }));
+
+    res.json(formattedPolls);
+  } catch (error) {
+    console.error('Polls-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Abstimmungen konnten nicht geladen werden' 
+    });
+  }
+});
+
+/**
+ * GET /api/polls/:id
+ * Einzelne Abstimmung abrufen
+ */
+app.get('/api/polls/:id', (req, res) => {
+  try {
+    const poll = db.getPollById.get(req.params.id);
+    
+    if (!poll) {
+      return res.status(404).json({ 
+        error: 'Nicht gefunden',
+        message: 'Abstimmung existiert nicht' 
+      });
+    }
+
+    res.json({
+      ...poll,
+      active: poll.active === 1
+    });
+  } catch (error) {
+    console.error('Poll-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Abstimmung konnte nicht geladen werden' 
+    });
+  }
+});
+
+// ==================== Voting Endpoints ====================
+
+/**
+ * POST /api/vote
+ * Abstimmen (Auth required)
+ */
+app.post('/api/vote', auth.authRequired, (req, res) => {
+  try {
+    const { poll_id, choice } = req.body;
+    const userId = req.user.user_id;
+
+    // Validierung
+    if (!poll_id || !choice) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'poll_id und choice sind erforderlich' 
+      });
+    }
+
+    if (!['yes', 'no'].includes(choice)) {
+      return res.status(400).json({ 
+        error: 'Ungültige Auswahl',
+        message: 'choice muss "yes" oder "no" sein' 
+      });
+    }
+
+    // Poll prüfen
+    const poll = db.getPollById.get(poll_id);
+    if (!poll) {
+      return res.status(404).json({ 
+        error: 'Nicht gefunden',
+        message: 'Abstimmung existiert nicht' 
+      });
+    }
+
+    if (poll.active !== 1) {
+      return res.status(400).json({ 
+        error: 'Abstimmung geschlossen',
+        message: 'Diese Abstimmung ist nicht mehr aktiv' 
+      });
+    }
+
+    // Prüfen ob User bereits abgestimmt hat
+    const existingVote = db.hasUserVoted.get(poll_id, userId);
+    if (existingVote) {
+      return res.status(409).json({ 
+        error: 'Bereits abgestimmt',
+        message: 'Du hast bereits an dieser Abstimmung teilgenommen' 
+      });
+    }
+
+    // Vote speichern
+    db.createVote.run(poll_id, userId, choice);
+
+    res.status(201).json({ 
+      message: 'Stimme erfolgreich abgegeben',
+      choice 
+    });
+
+  } catch (error) {
+    console.error('Vote-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Abstimmung fehlgeschlagen' 
+    });
+  }
+});
+
+/**
+ * GET /api/results
+ * Ergebnisse für eine Abstimmung abrufen
+ */
+app.get('/api/results', (req, res) => {
+  try {
+    const { poll_id } = req.query;
+
+    if (!poll_id) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'poll_id ist erforderlich' 
+      });
+    }
+
+    // Poll prüfen
+    const poll = db.getPollById.get(poll_id);
+    if (!poll) {
+      return res.status(404).json({ 
+        error: 'Nicht gefunden',
+        message: 'Abstimmung existiert nicht' 
+      });
+    }
+
+    // Ergebnisse abrufen
+    const results = db.getResults.get(poll_id);
+
+    res.json({
+      poll_id,
+      total: results.total || 0,
+      yes: results.yes || 0,
+      no: results.no || 0
+    });
+
+  } catch (error) {
+    console.error('Results-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Ergebnisse konnten nicht geladen werden' 
+    });
+  }
+});
+
+// ==================== Admin Endpoints ====================
+
+/**
+ * POST /api/admin/polls
+ * Neue Abstimmung erstellen (Admin)
+ */
+app.post('/api/admin/polls', auth.adminRequired, (req, res) => {
+  try {
+    const { title, active = true } = req.body;
+
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'Titel ist erforderlich' 
+      });
+    }
+
+    const pollId = uuidv4();
+    db.createPoll.run(pollId, title.trim(), active ? 1 : 0);
+
+    const poll = db.getPollById.get(pollId);
+
+    res.status(201).json({
+      message: 'Abstimmung erstellt',
+      poll: {
+        ...poll,
+        active: poll.active === 1
+      }
+    });
+
+  } catch (error) {
+    console.error('Admin Create-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Abstimmung konnte nicht erstellt werden' 
+    });
+  }
+});
+
+/**
+ * PATCH /api/admin/polls/:id
+ * Abstimmung aktualisieren (Admin)
+ */
+app.patch('/api/admin/polls/:id', auth.adminRequired, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { active } = req.body;
+
+    // Poll prüfen
+    const poll = db.getPollById.get(id);
+    if (!poll) {
+      return res.status(404).json({ 
+        error: 'Nicht gefunden',
+        message: 'Abstimmung existiert nicht' 
+      });
+    }
+
+    if (typeof active !== 'boolean') {
+      return res.status(400).json({ 
+        error: 'Ungültige Daten',
+        message: 'active muss true oder false sein' 
+      });
+    }
+
+    // Aktualisieren
+    db.updatePoll.run(active ? 1 : 0, id);
+    
+    const updatedPoll = db.getPollById.get(id);
+
+    res.json({
+      message: 'Abstimmung aktualisiert',
+      poll: {
+        ...updatedPoll,
+        active: updatedPoll.active === 1
+      }
+    });
+
+  } catch (error) {
+    console.error('Admin Update-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Abstimmung konnte nicht aktualisiert werden' 
+    });
+  }
+});
+
+/**
+ * DELETE /api/admin/polls/:id
+ * Abstimmung löschen (Admin)
+ */
+app.delete('/api/admin/polls/:id', auth.adminRequired, (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Poll prüfen
+    const poll = db.getPollById.get(id);
+    if (!poll) {
+      return res.status(404).json({ 
+        error: 'Nicht gefunden',
+        message: 'Abstimmung existiert nicht' 
+      });
+    }
+
+    // Votes und Poll löschen
+    db.resetVotes.run(id);
+    db.deletePoll.run(id);
+
+    res.json({ 
+      message: 'Abstimmung gelöscht',
+      id 
+    });
+
+  } catch (error) {
+    console.error('Admin Delete-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Abstimmung konnte nicht gelöscht werden' 
+    });
+  }
+});
+
+/**
+ * GET /api/admin/results
+ * Ergebnisse abrufen (Admin)
+ */
+app.get('/api/admin/results', auth.adminRequired, (req, res) => {
+  try {
+    const { poll_id } = req.query;
+
+    if (!poll_id) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'poll_id ist erforderlich' 
+      });
+    }
+
+    const poll = db.getPollById.get(poll_id);
+    if (!poll) {
+      return res.status(404).json({ 
+        error: 'Nicht gefunden',
+        message: 'Abstimmung existiert nicht' 
+      });
+    }
+
+    const results = db.getResults.get(poll_id);
+
+    res.json({
+      poll_id,
+      poll_title: poll.title,
+      total: results.total || 0,
+      yes: results.yes || 0,
+      no: results.no || 0
+    });
+
+  } catch (error) {
+    console.error('Admin Results-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Ergebnisse konnten nicht geladen werden' 
+    });
+  }
+});
+
+// ==================== Health Check ====================
+
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ==================== 404 Handler ====================
+
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ 
+    error: 'Nicht gefunden',
+    message: 'Dieser API-Endpoint existiert nicht' 
+  });
+});
+
+// ==================== Server starten ====================
+
+// Datenbank initialisieren
+db.initDatabase();
+
+// Server starten
+app.listen(PORT, () => {
+  console.log('');
+  console.log('╔════════════════════════════════════════════╗');
+  console.log('║       Brechtwahl Backend gestartet         ║');
+  console.log('╚════════════════════════════════════════════╝');
+  console.log('');
+  console.log(`✓ Server läuft auf Port ${PORT}`);
+  console.log(`✓ API-Basis: http://localhost:${PORT}/api`);
+  console.log(`✓ CORS: ${CORS_ORIGIN}`);
+  console.log(`✓ Frontend-Serving: ${SERVE_FRONTEND ? 'aktiviert' : 'deaktiviert'}`);
+  console.log('');
+});

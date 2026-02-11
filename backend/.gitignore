@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Datenbank (nicht committen, enthält User-Daten)
+db.sqlite
+db.sqlite-wal
+db.sqlite-shm
+
+# Umgebungsvariablen (enthält Secrets)
+.env
+
+# OS-Dateien
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
