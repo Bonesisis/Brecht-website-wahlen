@@ -1,83 +1,83 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>E-Mail bestätigen – Brechtwahl</title>
-  <link rel="stylesheet" href="./styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brechtwahl · E-Mail bestätigen</title>
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body data-page="verify">
-  <header class="header">
-    <div class="container header__container">
-      <a href="./index.html" class="header__logo">Brechtwahl</a>
-      <nav class="header__nav">
-        <a href="./login.html" class="header__link">Login</a>
-        <a href="./register.html" class="header__link">Registrieren</a>
+  <div class="container">
+    <header class="header">
+      <a href="./index.html" class="brand">
+        <div class="brand__badge">BW</div>
+        <div class="brand__text">
+          <div class="brand__title">Brechtwahl</div>
+          <div class="brand__subtitle">Digitale Abstimmungsplattform</div>
+        </div>
+      </a>
+      <nav class="nav">
+        <a href="./index.html">Startseite</a>
+        <a href="./login.html">Login</a>
       </nav>
-    </div>
-  </header>
+    </header>
 
-  <main class="main">
-    <div class="container">
-      <div class="card card--narrow" data-verify-card>
-        <h1 class="text-center mb-2">E-Mail bestätigen</h1>
-        <p class="text-center text-muted mb-4">
-          Gib den 6-stelligen Code ein, den du in der Konsole siehst.
-        </p>
+    <section class="card" data-verify-card>
+      <h1>E-Mail bestätigen</h1>
+      <p class="lead">Gib den 6-stelligen Bestätigungscode ein.</p>
+      
+      <div class="alert alert--info mb-3">
+        <strong>Hinweis:</strong> Der Code wird im Server-Terminal angezeigt (dort wo das Backend läuft).
+      </div>
 
-        <form data-verify-form>
-          <div class="form-group">
-            <label for="email">E-Mail</label>
-            <input 
-              type="email" 
-              id="email" 
-              class="input" 
-              data-verify-email
-              readonly
-            >
-          </div>
-
-          <div class="form-group">
-            <label for="code">Bestätigungscode</label>
-            <input 
-              type="text" 
-              id="code" 
-              class="input input--large" 
-              placeholder="123456"
-              maxlength="6"
-              pattern="[0-9]{6}"
-              inputmode="numeric"
-              autocomplete="one-time-code"
-              data-verify-code
-              required
-            >
-          </div>
-
-          <button type="submit" class="button button--full mt-3">
-            Bestätigen
-          </button>
-        </form>
-
-        <div class="text-center mt-4">
-          <button class="button button--ghost button--small" data-resend>
-            Code erneut senden
-          </button>
+      <form data-verify-form>
+        <div class="form-group">
+          <label for="email">E-Mail-Adresse</label>
+          <input 
+            type="email" 
+            id="email" 
+            class="input" 
+            data-verify-email
+            readonly
+          />
         </div>
 
-        <p class="text-center text-small text-muted mt-4">
-          <a href="./login.html">Zurück zum Login</a>
-        </p>
-      </div>
-    </div>
-  </main>
+        <div class="form-group">
+          <label for="code">Bestätigungscode</label>
+          <input 
+            type="text" 
+            id="code" 
+            class="input" 
+            placeholder="6-stelliger Code aus dem Terminal"
+            maxlength="6"
+            pattern="[0-9]{6}"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            data-verify-code
+            required
+          />
+        </div>
 
-  <footer class="footer">
-    <div class="container">
-      <p class="text-center text-small text-muted">
-        Brechtwahl · Demokratieprojekt der Brecht Schule Hamburg
+        <button type="submit" class="button button--full mt-3">
+          Bestätigen
+        </button>
+      </form>
+
+      <div class="text-center mt-3">
+        <button class="button button--ghost button--small" data-resend>
+          Neuen Code anfordern
+        </button>
+      </div>
+
+      <p class="text-center mt-4 text-small text-muted">
+        <a href="./login.html">Zurück zum Login</a>
       </p>
-    </div>
-  </footer>
+    </section>
+
+    <footer class="footer">
+      Brechtwahl · Demokratieprojekt der Brecht Schule Hamburg
+    </footer>
+  </div>
 
   <script src="./app.js"></script>
 </body>
