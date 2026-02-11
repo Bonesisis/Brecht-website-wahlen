@@ -732,6 +732,21 @@ function initLogout() {
   }
 }
 
+// ==================== Auth UI Update ====================
+function updateAuthUI() {
+  const loggedIn = isLoggedIn();
+  
+  // Elemente die nur bei Login sichtbar sind
+  document.querySelectorAll("[data-auth-show]").forEach(el => {
+    el.style.display = loggedIn ? "" : "none";
+  });
+  
+  // Elemente die nur bei Logout sichtbar sind
+  document.querySelectorAll("[data-auth-hide]").forEach(el => {
+    el.style.display = loggedIn ? "none" : "";
+  });
+}
+
 // ==================== Page Router ====================
 const page = document.body?.dataset.page;
 if (page === "index") initIndex();
@@ -742,5 +757,6 @@ if (page === "polls") initPolls();
 if (page === "vote") initVote();
 if (page === "admin") initAdmin();
 
-// Always init logout button if present
+// Always init logout button and auth UI
 initLogout();
+updateAuthUI();
