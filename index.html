@@ -3,45 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Brecht Abstimmungen · Login</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Brechtwahl · Digitale Abstimmungsplattform</title>
+  <link rel="stylesheet" href="./styles.css" />
 </head>
-<body data-page="login">
+<body data-page="index">
   <div class="container">
     <header class="header">
-      <div class="brand">
-        <div class="brand__badge">BS</div>
-        <div>
-          <div class="brand__title">Brecht Schule Hamburg</div>
-          <p class="helper">Digitale Abstimmungsplattform</p>
+      <a href="./index.html" class="brand">
+        <div class="brand__badge">BW</div>
+        <div class="brand__text">
+          <div class="brand__title">Brechtwahl</div>
+          <div class="brand__subtitle">Digitale Abstimmungsplattform</div>
         </div>
-      </div>
+      </a>
       <nav class="nav">
-        <a href="polls.html">Abstimmungen</a>
-        <a href="admin.html">Admin</a>
+        <a href="./polls.html">Alle Abstimmungen</a>
+        <a href="./login.html">Login</a>
+        <a href="./register.html">Registrieren</a>
       </nav>
     </header>
 
-    <section class="card">
-      <h1>Willkommen zur Abstimmung</h1>
-      <p>Bitte gib deinen Namen ein, um an den Abstimmungen teilnehmen zu können.</p>
-      <form data-login-form class="grid">
-        <label>
-          <span class="helper">Name</span>
-          <input class="input" type="text" placeholder="Vorname Nachname" data-login-input required />
-        </label>
-        <button class="button" type="submit">Weiter zur Übersicht</button>
-      </form>
+    <section class="hero">
+      <h1 class="hero__title">Deine Stimme zählt!</h1>
+      <p class="hero__subtitle">Nimm an schulweiten Abstimmungen teil und gestalte unsere Schule aktiv mit.</p>
+      <div class="flex flex--center" style="gap: 12px;">
+        <a href="./register.html" class="button">Jetzt registrieren</a>
+        <a href="./login.html" class="button button--secondary">Anmelden</a>
+      </div>
     </section>
 
-    <section class="card card--soft">
-      <h2>Hinweis</h2>
-      <p>Diese Version läuft vollständig im Browser und speichert Daten lokal. Später kann das System nahtlos auf ein echtes Backend umgestellt werden.</p>
+    <section>
+      <h2 class="mb-3">Aktuelle Abstimmungen</h2>
+      <div class="grid" data-poll-list>
+        <!-- Polls werden per JS geladen -->
+      </div>
     </section>
 
-    <div class="footer">Stand: 11. Februar 2026 · Mock-Version</div>
+    <section class="card card--soft mt-4">
+      <h3>Wie funktioniert's?</h3>
+      <p class="mb-0">Registriere dich mit deiner Schul-E-Mail, melde dich an und stimme bei aktuellen Fragen ab. Pro Person ist nur eine Stimme möglich. Die Ergebnisse siehst du direkt nach deiner Abstimmung.</p>
+    </section>
+
+    <footer class="footer">
+      Brechtwahl · Demokratieprojekt der Brecht Schule Hamburg · Mock-Version
+    </footer>
   </div>
 
-  <script src="app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>

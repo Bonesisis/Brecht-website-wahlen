@@ -3,45 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Brecht Abstimmungen · Admin</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Brechtwahl · Admin</title>
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body data-page="admin">
   <div class="container">
     <header class="header">
-      <div class="brand">
-        <div class="brand__badge">BS</div>
-        <div>
-          <div class="brand__title">Admin-Bereich</div>
-          <p class="helper">Abstimmungen verwalten und kontrollieren</p>
+      <a href="./index.html" class="brand">
+        <div class="brand__badge">BW</div>
+        <div class="brand__text">
+          <div class="brand__title">Brechtwahl</div>
+          <div class="brand__subtitle">Admin-Bereich</div>
         </div>
-      </div>
+      </a>
       <nav class="nav">
-        <a href="polls.html">Abstimmungen</a>
-        <a href="index.html">Login</a>
+        <a href="./polls.html">Alle Abstimmungen</a>
+        <a href="#" data-logout>Abmelden</a>
       </nav>
     </header>
 
-    <section class="card">
+    <section class="card card--highlight">
       <h2>Neue Abstimmung erstellen</h2>
-      <form class="grid" data-admin-form>
-        <label>
-          <span class="helper">Titel</span>
-          <input class="input" type="text" placeholder="Kurzer Titel" data-admin-title required />
-        </label>
-        <label>
-          <span class="helper">Frage</span>
-          <input class="input" type="text" placeholder="Abstimmungsfrage" data-admin-question required />
-        </label>
-        <button class="button" type="submit">Abstimmung anlegen</button>
+      <form data-admin-form>
+        <div class="form-group">
+          <label class="form-label" for="title">Titel</label>
+          <input 
+            class="input" 
+            type="text" 
+            id="title"
+            placeholder="Kurzer, prägnanter Titel" 
+            data-admin-title 
+            required 
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="question">Abstimmungsfrage</label>
+          <input 
+            class="input" 
+            type="text" 
+            id="question"
+            placeholder="Die Frage, über die abgestimmt wird" 
+            data-admin-question 
+            required 
+          />
+        </div>
+        <button class="button" type="submit">Abstimmung erstellen</button>
       </form>
     </section>
 
+    <h2 class="mt-4 mb-3">Bestehende Abstimmungen</h2>
     <section class="grid" data-admin-list></section>
 
-    <div class="footer">Admin-Änderungen werden lokal gespeichert.</div>
+    <footer class="footer">
+      Brechtwahl · Admin-Änderungen werden lokal gespeichert
+    </footer>
   </div>
 
-  <script src="app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>

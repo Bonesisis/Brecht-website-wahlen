@@ -3,68 +3,76 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Brecht Abstimmungen · Abstimmen</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Brechtwahl · Abstimmen</title>
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body data-page="vote">
   <div class="container">
     <header class="header">
-      <div class="brand">
-        <div class="brand__badge">BS</div>
-        <div>
-          <div class="brand__title">Abstimmung</div>
-          <p class="helper">Stimme ab und sieh das Ergebnis</p>
+      <a href="./index.html" class="brand">
+        <div class="brand__badge">BW</div>
+        <div class="brand__text">
+          <div class="brand__title">Brechtwahl</div>
+          <div class="brand__subtitle">Abstimmung</div>
         </div>
-      </div>
+      </a>
       <nav class="nav">
-        <a href="polls.html">Abstimmungen</a>
-        <a href="admin.html">Admin</a>
+        <a href="./polls.html">Alle Abstimmungen</a>
+        <a href="#" data-logout>Abmelden</a>
       </nav>
     </header>
 
     <section class="card">
-      <div class="flex">
+      <div class="poll-card__header mb-2">
         <div>
           <h1 data-poll-title></h1>
-          <p data-poll-question></p>
+          <p class="lead mb-0" data-poll-question></p>
         </div>
         <span data-poll-status class="badge"></span>
       </div>
 
-      <div data-vote-section class="grid grid--2" style="margin-top: 18px;">
+      <div data-vote-section class="grid grid--2 mt-3">
         <button class="button" data-vote="yes">Ja</button>
-        <button class="button button--ghost" data-vote="no">Nein</button>
+        <button class="button button--secondary" data-vote="no">Nein</button>
       </div>
 
-      <div data-result-section class="hidden" style="margin-top: 20px;">
-        <div class="flex" style="margin-bottom: 12px;">
-          <h3>Ergebnis</h3>
-          <span class="helper" data-result-info></span>
+      <div data-result-section class="hidden mt-3">
+        <div class="flex mb-2">
+          <h3 class="mb-0">Ergebnis</h3>
+          <span class="text-small text-muted" data-result-info></span>
         </div>
-        <div style="margin-bottom: 12px;">
-          <div class="flex">
-            <span class="helper" data-yes-percent></span>
+        
+        <div class="result-row">
+          <div class="result-row__header">
+            <span class="result-row__label">Ja</span>
+            <span class="result-row__value" data-yes-percent></span>
           </div>
           <div class="progress">
             <div class="progress__bar" data-yes-bar></div>
           </div>
         </div>
-        <div>
-          <div class="flex">
-            <span class="helper" data-no-percent></span>
+        
+        <div class="result-row mb-0">
+          <div class="result-row__header">
+            <span class="result-row__label">Nein</span>
+            <span class="result-row__value" data-no-percent></span>
           </div>
           <div class="progress">
-            <div class="progress__bar" data-no-bar style="background: var(--green-200);"></div>
+            <div class="progress__bar progress__bar--secondary" data-no-bar></div>
           </div>
         </div>
       </div>
     </section>
 
-    <div class="footer">
-      <a class="button button--ghost" href="polls.html">Zurück zur Übersicht</a>
+    <div class="mt-3">
+      <a class="button button--ghost" href="./polls.html">← Zurück zur Übersicht</a>
     </div>
+
+    <footer class="footer">
+      Brechtwahl · Mock-Version
+    </footer>
   </div>
 
-  <script src="app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>

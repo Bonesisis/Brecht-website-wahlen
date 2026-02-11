@@ -1,25 +1,28 @@
 const USE_MOCK = true;
 const STORAGE_KEYS = {
-  user: "bw_user",
+  userEmail: "bw_userEmail",
+  userPassword: "bw_userPassword",
+  isLoggedIn: "bw_isLoggedIn",
   polls: "bw_polls"
 };
 
+// ==================== API Layer ====================
 const api = {
   async getPolls() {
     if (!USE_MOCK) {
-      return fetch("/api/polls").then((r) => r.json());
+      return fetch("./api/polls").then((r) => r.json());
     }
     return loadPolls();
   },
   async getPoll(id) {
     if (!USE_MOCK) {
-      return fetch(`/api/polls/${id}`).then((r) => r.json());
+      return fetch(`./api/polls/${id}`).then((r) => r.json());
     }
     return loadPolls().find((poll) => poll.id === id);
   },
   async createPoll(payload) {
     if (!USE_MOCK) {
-      return fetch("/api/polls", {
+      return fetch("./api/polls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -32,7 +35,7 @@ const api = {
   },
   async updatePoll(id, updates) {
     if (!USE_MOCK) {
-      return fetch(`/api/polls/${id}`, {
+      return fetch(`./api/polls/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates)
@@ -47,6 +50,7 @@ const api = {
   }
 };
 
+// ==================== Poll Storage ====================
 function loadPolls() {
   const raw = localStorage.getItem(STORAGE_KEYS.polls);
   if (!raw) return seedPolls();
@@ -84,23 +88,56 @@ function seedPolls() {
   return initial;
 }
 
-function getUserName() {
-  return localStorage.getItem(STORAGE_KEYS.user);
+// ==================== Auth Functions ====================
+function isValidSchoolEmail(email) {
+  // Must end with @brecht-schulen.de
+  // Must have at least one dot before @
+  const regex = /^[a-zA-ZäöüÄÖÜß]+\.[a-zA-ZäöüÄÖÜß]+@brecht-schulen\.de$/i;
+  return regex.test(email.trim());
 }
 
-function setUserName(name) {
-  localStorage.setItem(STORAGE_KEYS.user, name.trim());
+function isRegistered() {
+  return !!localStorage.getItem(STORAGE_KEYS.userEmail);
 }
 
-function requireUser() {
-  const user = getUserName();
-  if (!user) {
-    window.location.href = "index.html";
-    return null;
+function isLoggedIn() {
+  return localStorage.getItem(STORAGE_KEYS.isLoggedIn) === "true";
+}
+
+function getRegisteredEmail() {
+  return localStorage.getItem(STORAGE_KEYS.userEmail);
+}
+
+function getRegisteredPassword() {
+  return localStorage.getItem(STORAGE_KEYS.userPassword);
+}
+
+function register(email, password) {
+  localStorage.setItem(STORAGE_KEYS.userEmail, email.trim().toLowerCase());
+  localStorage.setItem(STORAGE_KEYS.userPassword, password);
+  localStorage.setItem(STORAGE_KEYS.isLoggedIn, "true");
+}
+
+function login() {
+  localStorage.setItem(STORAGE_KEYS.isLoggedIn, "true");
+}
+
+function logout() {
+  localStorage.setItem(STORAGE_KEYS.isLoggedIn, "false");
+}
+
+function requireLogin(redirectMessage = false) {
+  if (!isLoggedIn()) {
+    const url = redirectMessage 
+      ? "./login.html?redirect=true" 
+      : "./login.html";
+    window.location.href = url;
+    return false;
   }
-  return user;
+  return true;
 }
 
+// ==================== Helper Functions ====================
 function formatDate(value) {
   if (!value) return "";
   return new Date(value).toLocaleDateString("de-DE", {
@@ -110,8 +147,8 @@ function formatDate(value) {
   });
 }
 
-function hasVoted(poll, user) {
-  return poll.votes.yes.includes(user) || poll.votes.no.includes(user);
+function hasVoted(poll, userEmail) {
+  return poll.votes.yes.includes(userEmail) || poll.votes.no.includes(userEmail);
 }
 
 function countVotes(poll) {
@@ -128,68 +165,215 @@ function updateResults(poll) {
   return { yes, no, total, yesPercent, noPercent };
 }
 
-function initLogin() {
-  const form = document.querySelector("[data-login-form]");
-  const input = document.querySelector("[data-login-input]");
-  const cached = getUserName();
-  if (cached) input.value = cached;
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const name = input.value.trim();
-    if (!name) return;
-    setUserName(name);
-    window.location.href = "polls.html";
+function showAlert(container, message, type = "error") {
+  const existing = container.querySelector(".alert");
+  if (existing) existing.remove();
+  
+  const alert = document.createElement("div");
+  alert.className = `alert alert--${type}`;
+  alert.textContent = message;
+  container.prepend(alert);
+}
+
+// ==================== Page: Index (Startseite) ====================
+async function initIndex() {
+  const list = document.querySelector("[data-poll-list]");
+  if (!list) return;
+  
+  const polls = await api.getPolls();
+  const activePolls = polls.filter(p => p.active);
+  list.innerHTML = "";
+
+  if (!activePolls.length) {
+    list.innerHTML = '<div class="card card--soft"><p class="mb-0">Aktuell keine aktiven Abstimmungen.</p></div>';
+    return;
+  }
+
+  activePolls.forEach((poll) => {
+    const userEmail = getRegisteredEmail();
+    const voted = userEmail ? hasVoted(poll, userEmail) : false;
+    const results = updateResults(poll);
+    
+    const card = document.createElement("div");
+    card.className = "card poll-card";
+    card.innerHTML = `
+      <div class="poll-card__header">
+        <h3 class="poll-card__title">${poll.title}</h3>
+        <span class="badge badge--active">Aktiv</span>
+      </div>
+      <p class="poll-card__question">${poll.question}</p>
+      <div class="poll-card__meta">
+        <span class="text-small text-muted">${results.total} Stimmen · ${formatDate(poll.createdAt)}</span>
+        <a href="${isLoggedIn() ? `./vote.html?id=${poll.id}` : './login.html?redirect=true'}" class="button button--small">
+          ${voted ? "Ergebnis ansehen" : "Abstimmen"}
+        </a>
+      </div>
+    `;
+    list.appendChild(card);
   });
 }
 
+// ==================== Page: Register ====================
+function initRegister() {
+  const form = document.querySelector("[data-register-form]");
+  const emailInput = document.querySelector("[data-register-email]");
+  const passwordInput = document.querySelector("[data-register-password]");
+  const card = document.querySelector("[data-register-card]");
+  
+  if (!form) return;
+
+  // Check if already registered
+  if (isRegistered()) {
+    form.innerHTML = `
+      <div class="alert alert--info">Du bist bereits registriert. Bitte melde dich an.</div>
+      <a href="./login.html" class="button button--full">Zum Login</a>
+    `;
+    return;
+  }
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    // Validate email format
+    if (!isValidSchoolEmail(email)) {
+      showAlert(card, "Bitte nutze deine Schul-E-Mail im Format vorname.nachname@brecht-schulen.de");
+      emailInput.classList.add("input--error");
+      return;
+    }
+
+    // Validate password
+    if (password.length < 4) {
+      showAlert(card, "Bitte wähle ein Passwort mit mindestens 4 Zeichen.");
+      passwordInput.classList.add("input--error");
+      return;
+    }
+
+    // Register and login
+    register(email, password);
+    window.location.href = "./polls.html";
+  });
+
+  // Remove error styling on input
+  emailInput.addEventListener("input", () => emailInput.classList.remove("input--error"));
+  passwordInput.addEventListener("input", () => passwordInput.classList.remove("input--error"));
+}
+
+// ==================== Page: Login ====================
+function initLogin() {
+  const form = document.querySelector("[data-login-form]");
+  const emailInput = document.querySelector("[data-login-email]");
+  const passwordInput = document.querySelector("[data-login-password]");
+  const card = document.querySelector("[data-login-card]");
+  
+  if (!form) return;
+
+  // Show redirect message if needed
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("redirect") === "true") {
+    showAlert(card, "Du musst dich erst anmelden, um abzustimmen.", "info");
+  }
+
+  // Check if not registered
+  if (!isRegistered()) {
+    showAlert(card, "Du hast noch keinen Account. Bitte registriere dich zuerst.", "info");
+  }
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = emailInput.value.trim().toLowerCase();
+    const password = passwordInput.value;
+
+    const registeredEmail = getRegisteredEmail();
+    const registeredPassword = getRegisteredPassword();
+
+    // Check if registered
+    if (!registeredEmail) {
+      showAlert(card, "Kein Account gefunden. Bitte registriere dich zuerst.");
+      return;
+    }
+
+    // Check email
+    if (email !== registeredEmail) {
+      showAlert(card, "E-Mail-Adresse stimmt nicht überein.");
+      emailInput.classList.add("input--error");
+      return;
+    }
+
+    // Check password
+    if (password !== registeredPassword) {
+      showAlert(card, "Falsches Passwort.");
+      passwordInput.classList.add("input--error");
+      return;
+    }
+
+    // Login successful
+    login();
+    window.location.href = "./polls.html";
+  });
+
+  // Remove error styling on input
+  emailInput.addEventListener("input", () => emailInput.classList.remove("input--error"));
+  passwordInput.addEventListener("input", () => passwordInput.classList.remove("input--error"));
+}
+
+// ==================== Page: Polls ====================
 async function initPolls() {
-  const user = requireUser();
-  if (!user) return;
+  if (!requireLogin(true)) return;
+  
   const list = document.querySelector("[data-poll-list]");
+  const userEmail = getRegisteredEmail();
   const polls = await api.getPolls();
   list.innerHTML = "";
 
   if (!polls.length) {
-    list.innerHTML = "<div class=\"card card--soft\">Noch keine Abstimmungen vorhanden.</div>";
+    list.innerHTML = '<div class="card card--soft"><p class="mb-0">Noch keine Abstimmungen vorhanden.</p></div>';
     return;
   }
 
   polls.forEach((poll) => {
+    const voted = hasVoted(poll, userEmail);
+    const results = updateResults(poll);
+    
     const card = document.createElement("div");
-    card.className = "card poll-card";
+    card.className = "card card--clickable poll-card";
     card.innerHTML = `
-      <div class="flex">
-        <h3>${poll.title}</h3>
+      <div class="poll-card__header">
+        <h3 class="poll-card__title">${poll.title}</h3>
         <span class="badge ${poll.active ? "badge--active" : "badge--closed"}">
           ${poll.active ? "Aktiv" : "Geschlossen"}
         </span>
       </div>
-      <p>${poll.question}</p>
-      <div class="flex">
-        <span class="helper">${formatDate(poll.createdAt)}</span>
-        <span class="helper">${hasVoted(poll, user) ? "Bereits abgestimmt" : "Noch nicht abgestimmt"}</span>
+      <p class="poll-card__question">${poll.question}</p>
+      <div class="poll-card__meta">
+        <span class="text-small text-muted">${results.total} Stimmen · ${formatDate(poll.createdAt)}</span>
+        <span class="text-small ${voted ? "text-muted" : ""}">${voted ? "✓ Abgestimmt" : "Noch nicht abgestimmt"}</span>
       </div>
     `;
     card.addEventListener("click", () => {
-      window.location.href = `vote.html?id=${poll.id}`;
+      window.location.href = `./vote.html?id=${poll.id}`;
     });
     list.appendChild(card);
   });
 }
 
+// ==================== Page: Vote ====================
 async function initVote() {
-  const user = requireUser();
-  if (!user) return;
+  if (!requireLogin(true)) return;
+  
+  const userEmail = getRegisteredEmail();
   const params = new URLSearchParams(window.location.search);
   const pollId = params.get("id");
+  
   if (!pollId) {
-    window.location.href = "polls.html";
+    window.location.href = "./polls.html";
     return;
   }
 
   const poll = await api.getPoll(pollId);
   if (!poll) {
-    window.location.href = "polls.html";
+    window.location.href = "./polls.html";
     return;
   }
 
@@ -209,7 +393,7 @@ async function initVote() {
   status.textContent = poll.active ? "Aktiv" : "Geschlossen";
   status.className = `badge ${poll.active ? "badge--active" : "badge--closed"}`;
 
-  const voted = hasVoted(poll, user);
+  const voted = hasVoted(poll, userEmail);
 
   voteSection.classList.toggle("hidden", !poll.active || voted);
   resultSection.classList.toggle("hidden", !voted && poll.active);
@@ -228,12 +412,12 @@ async function initVote() {
   const buttons = document.querySelectorAll("[data-vote]");
   buttons.forEach((button) => {
     button.addEventListener("click", async () => {
-      if (!poll.active || hasVoted(poll, user)) return;
+      if (!poll.active || hasVoted(poll, userEmail)) return;
       const choice = button.dataset.vote;
       if (choice === "yes") {
-        poll.votes.yes.push(user);
+        poll.votes.yes.push(userEmail);
       } else {
-        poll.votes.no.push(user);
+        poll.votes.no.push(userEmail);
       }
       await api.updatePoll(poll.id, { votes: poll.votes });
       voteSection.classList.add("hidden");
@@ -243,9 +427,10 @@ async function initVote() {
   });
 }
 
+// ==================== Page: Admin ====================
 async function initAdmin() {
-  const user = requireUser();
-  if (!user) return;
+  if (!requireLogin(true)) return;
+  
   const list = document.querySelector("[data-admin-list]");
   const form = document.querySelector("[data-admin-form]");
   const titleInput = document.querySelector("[data-admin-title]");
@@ -259,21 +444,21 @@ async function initAdmin() {
       const card = document.createElement("div");
       card.className = "card";
       card.innerHTML = `
-        <div class="flex">
+        <div class="poll-card__header">
           <div>
-            <h3>${poll.title}</h3>
-            <p>${poll.question}</p>
+            <h3 class="poll-card__title">${poll.title}</h3>
+            <p class="poll-card__question mb-0">${poll.question}</p>
           </div>
           <span class="badge ${poll.active ? "badge--active" : "badge--closed"}">
             ${poll.active ? "Aktiv" : "Geschlossen"}
           </span>
         </div>
-        <div class="helper">${results.total} Stimmen · ${formatDate(poll.createdAt)}</div>
-        <div class="grid grid--2" style="margin-top: 14px;">
-          <button class="button button--ghost" data-action="toggle" data-id="${poll.id}">
+        <div class="text-small text-muted mt-2">${results.total} Stimmen · ${formatDate(poll.createdAt)}</div>
+        <div class="grid grid--2 mt-3">
+          <button class="button button--secondary button--small" data-action="toggle" data-id="${poll.id}">
             ${poll.active ? "Deaktivieren" : "Aktivieren"}
           </button>
-          <button class="button button--ghost" data-action="reset" data-id="${poll.id}">Stimmen zurücksetzen</button>
+          <button class="button button--ghost button--small" data-action="reset" data-id="${poll.id}">Stimmen zurücksetzen</button>
         </div>
       `;
       list.appendChild(card);
@@ -318,8 +503,26 @@ async function initAdmin() {
   render();
 }
 
+// ==================== Logout Handler ====================
+function initLogout() {
+  const logoutBtn = document.querySelector("[data-logout]");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      logout();
+      window.location.href = "./index.html";
+    });
+  }
+}
+
+// ==================== Page Router ====================
 const page = document.body?.dataset.page;
+if (page === "index") initIndex();
+if (page === "register") initRegister();
 if (page === "login") initLogin();
 if (page === "polls") initPolls();
 if (page === "vote") initVote();
 if (page === "admin") initAdmin();
+
+// Always init logout button if present
+initLogout();
