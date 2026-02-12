@@ -65,6 +65,29 @@ const api = {
     return data;
   },
 
+  // Password Reset
+  async forgotPassword(email) {
+    const res = await fetch(`${API_BASE}/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Anfrage fehlgeschlagen");
+    return data;
+  },
+
+  async resetPassword(email, code, newPassword) {
+    const res = await fetch(`${API_BASE}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Passwort-Reset fehlgeschlagen");
+    return data;
+  },
+
   // Polls
   async getPolls() {
     if (USE_MOCK) return loadPolls();
@@ -749,6 +772,87 @@ function updateAuthUI() {
   });
 }
 
+// ==================== Page: Forgot Password ====================
+function initForgotPassword() {
+  const form = document.querySelector("[data-forgot-form]");
+  const emailInput = document.querySelector("[data-forgot-email]");
+  const card = document.querySelector("[data-forgot-card]");
+  
+  if (!form) return;
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const email = emailInput.value.trim();
+
+    if (!isValidSchoolEmail(email)) {
+      showAlert(card, "Bitte nutze deine Schul-E-Mail (vorname.nachname@brecht-schule.hamburg oder nachname@brecht-schule.hamburg)");
+      emailInput.classList.add("input--error");
+      return;
+    }
+
+    try {
+      await api.forgotPassword(email);
+      localStorage.setItem("bw_resetEmail", email);
+      showAlert(card, "Falls ein Account mit dieser E-Mail existiert, wurde ein Reset-Code gesendet.", "success");
+      
+      // Nach 2 Sekunden zur Reset-Seite weiterleiten
+      setTimeout(() => {
+        window.location.href = "./reset-password.html";
+      }, 2000);
+    } catch (error) {
+      showAlert(card, error.message);
+    }
+  });
+}
+
+// ==================== Page: Reset Password ====================
+function initResetPassword() {
+  const form = document.querySelector("[data-reset-form]");
+  const emailInput = document.querySelector("[data-reset-email]");
+  const codeInput = document.querySelector("[data-reset-code]");
+  const passwordInput = document.querySelector("[data-reset-password]");
+  const card = document.querySelector("[data-reset-card]");
+  
+  if (!form) return;
+
+  // E-Mail aus localStorage laden
+  const savedEmail = localStorage.getItem("bw_resetEmail");
+  if (savedEmail && emailInput) {
+    emailInput.value = savedEmail;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const email = emailInput.value.trim();
+    const code = codeInput.value.trim();
+    const newPassword = passwordInput.value;
+
+    if (!code || code.length !== 6) {
+      showAlert(card, "Bitte gib den 6-stelligen Code aus der E-Mail ein.");
+      codeInput.classList.add("input--error");
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      showAlert(card, "Das Passwort muss mindestens 4 Zeichen haben.");
+      passwordInput.classList.add("input--error");
+      return;
+    }
+
+    try {
+      await api.resetPassword(email, code, newPassword);
+      localStorage.removeItem("bw_resetEmail");
+      showAlert(card, "Passwort erfolgreich geändert! Du wirst zum Login weitergeleitet...", "success");
+      
+      setTimeout(() => {
+        window.location.href = "./login.html";
+      }, 2000);
+    } catch (error) {
+      showAlert(card, error.message);
+    }
+  });
+}
+
 // ==================== Page Router ====================
 const page = document.body?.dataset.page;
 if (page === "index") initIndex();
@@ -758,6 +862,8 @@ if (page === "verify") initVerify();
 if (page === "polls") initPolls();
 if (page === "vote") initVote();
 if (page === "admin") initAdmin();
+if (page === "forgot-password") initForgotPassword();
+if (page === "reset-password") initResetPassword();
 
 // Always init logout button and auth UI
 initLogout();

@@ -27,7 +27,7 @@
       <p class="lead">Gib den 6-stelligen Bestätigungscode ein.</p>
       
       <div class="alert alert--info mb-3">
-        <strong>Hinweis:</strong> Der Code wird im Server-Terminal angezeigt (dort wo das Backend läuft).
+        <strong>Hinweis:</strong> Der Bestätigungscode wurde an deine E-Mail-Adresse gesendet. Prüfe auch deinen Spam-Ordner.
       </div>
 
       <form data-verify-form>
@@ -48,7 +48,7 @@
             type="text" 
             id="code" 
             class="input" 
-            placeholder="6-stelliger Code aus dem Terminal"
+            placeholder="6-stelliger Code aus der E-Mail"
             maxlength="6"
             pattern="[0-9]{6}"
             inputmode="numeric"
@@ -76,6 +76,7 @@
 
     <footer class="footer">
       Brechtwahl · Demokratieprojekt der Brecht Schule Hamburg
+      <span class="footer__admin"><a href="./admin.html">Admin</a></span>
     </footer>
   </div>
 
