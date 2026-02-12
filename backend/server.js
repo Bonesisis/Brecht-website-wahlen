@@ -607,6 +607,40 @@ app.get('/api/admin/results', auth.adminRequired, (req, res) => {
   }
 });
 
+// ==================== Test Voting (DEV) ====================
+// Leichte Test-Endpoints ohne Auth, nur für Frontend-Tests (nicht für Produktion)
+const testVotes = { yes: 0, no: 0 };
+
+app.post('/api/test/vote', (req, res) => {
+  try {
+    const { choice } = req.body;
+    if (!choice || !['yes', 'no'].includes(choice)) {
+      return res.status(400).json({ 
+        error: 'Ungültige Auswahl',
+        message: 'choice muss "yes" oder "no" sein' 
+      });
+    }
+
+    testVotes[choice] = (testVotes[choice] || 0) + 1;
+
+    res.status(201).json({ message: 'Stimme gezählt', counts: testVotes });
+  } catch (error) {
+    console.error('Test Vote-Fehler:', error);
+    res.status(500).json({ error: 'Serverfehler', message: 'Stimmen konnten nicht gezählt werden' });
+  }
+});
+
+app.get('/api/test/votes', (req, res) => {
+  try {
+    const yes = testVotes.yes || 0;
+    const no = testVotes.no || 0;
+    res.json({ yes, no, total: yes + no });
+  } catch (error) {
+    console.error('Test Votes-Fehler:', error);
+    res.status(500).json({ error: 'Serverfehler' });
+  }
+});
+
 // ==================== Health Check ====================
 
 app.get('/api/health', (req, res) => {
