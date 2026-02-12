@@ -22,6 +22,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const app = express();
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
@@ -31,9 +32,6 @@ const path = require('path');
 const db = require('./db');
 const auth = require('./auth');
 const mail = require('./mail');
-
-// Express-App erstellen
-const app = express();
 
 // ==================== Konfiguration ====================
 
@@ -684,3 +682,7 @@ startServer().catch(err => {
   console.error('Fehler beim Starten:', err);
   process.exit(1);
 });
+
+// Test-API einbinden
+const testRouter = require('./routes/test');
+app.use('/api/test', testRouter);
