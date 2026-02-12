@@ -558,6 +558,22 @@ p {
   text-align: center;
 }
 
+.footer__admin {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.75rem;
+}
+
+.footer__admin a {
+  color: #999;
+  text-decoration: none;
+}
+
+.footer__admin a:hover {
+  color: #666;
+  text-decoration: underline;
+}
+
 /* Divider */
 .divider {
   height: 1px;

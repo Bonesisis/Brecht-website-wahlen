@@ -139,6 +139,94 @@ Demokratieprojekt der Brecht Schule Hamburg
 }
 
 /**
+ * Passwort-Reset-Code per E-Mail senden
+ * @param {string} email - Empfänger-E-Mail
+ * @param {string} code - 6-stelliger Reset-Code
+ * @returns {Promise<boolean>} - true wenn erfolgreich
+ */
+async function sendPasswordResetEmail(email, code) {
+  // Immer in Konsole ausgeben (für Debugging)
+  console.log('');
+  console.log('═══════════════════════════════════════════════');
+  console.log(`  🔑 PASSWORT-RESET-CODE für ${email}`);
+  console.log(`  Code: ${code}`);
+  console.log('═══════════════════════════════════════════════');
+  console.log('');
+
+  // Wenn kein Transporter konfiguriert, nur Konsole
+  if (!transporter) {
+    console.log('  (Nur Konsole - SMTP nicht konfiguriert)');
+    return true;
+  }
+
+  try {
+    const mailOptions = {
+      from: `"${SMTP_FROM_NAME}" <${SMTP_FROM}>`,
+      to: email,
+      subject: 'Dein Passwort-Reset-Code für Brechtwahl',
+      text: `
+Hallo,
+
+du hast angefordert, dein Passwort zurückzusetzen.
+
+Dein Reset-Code lautet:
+
+    ${code}
+
+Gib diesen Code auf der Passwort-Reset-Seite ein, um ein neues Passwort zu setzen.
+
+Falls du dies nicht angefordert hast, kannst du diese E-Mail ignorieren.
+
+Viele Grüße,
+Das Brechtwahl-Team
+Demokratieprojekt der Brecht Schule Hamburg
+      `.trim(),
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 500px; margin: 0 auto; padding: 20px; }
+    .header { background: #2d7a4f; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+    .code { font-size: 32px; font-weight: bold; text-align: center; background: white; padding: 20px; border-radius: 8px; margin: 20px 0; letter-spacing: 4px; color: #c44; border: 2px dashed #c44; }
+    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin:0">🔑 Passwort zurücksetzen</h1>
+    </div>
+    <div class="content">
+      <p>Hallo,</p>
+      <p>du hast angefordert, dein Passwort zurückzusetzen. Dein Reset-Code lautet:</p>
+      <div class="code">${code}</div>
+      <p>Gib diesen Code auf der Passwort-Reset-Seite ein, um ein neues Passwort zu setzen.</p>
+      <p style="color: #666; font-size: 14px;">Falls du dies nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>
+    </div>
+    <div class="footer">
+      <p>Brechtwahl · Demokratieprojekt der Brecht Schule Hamburg</p>
+    </div>
+  </div>
+</body>
+</html>
+      `.trim()
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✓ Reset-E-Mail gesendet an ${email} (Message-ID: ${info.messageId})`);
+    return true;
+
+  } catch (error) {
+    console.error(`✗ E-Mail-Fehler für ${email}:`, error.message);
+    return true;
+  }
+}
+
+/**
  * Test-E-Mail senden (für Admin-Tests)
  */
 async function sendTestEmail(toEmail) {
@@ -166,6 +254,7 @@ initTransporter();
 
 module.exports = {
   sendVerificationEmail,
+  sendPasswordResetEmail,
   sendTestEmail,
   initTransporter
 };

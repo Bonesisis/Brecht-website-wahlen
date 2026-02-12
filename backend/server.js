@@ -278,6 +278,112 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// ==================== Password Reset ====================
+
+/**
+ * POST /api/forgot-password
+ * Reset-Code anfordern
+ */
+app.post('/api/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'E-Mail ist erforderlich' 
+      });
+    }
+
+    // User suchen
+    const user = db.findUserByEmail(email.toLowerCase().trim());
+    if (!user) {
+      // Aus Sicherheitsgründen gleiche Antwort wie bei Erfolg
+      return res.json({ 
+        message: 'Falls ein Account mit dieser E-Mail existiert, wurde ein Reset-Code gesendet.'
+      });
+    }
+
+    // Reset-Code generieren (nutzen verification_code Spalte)
+    const resetCode = generateVerificationCode();
+    db.updateVerificationCode(email.toLowerCase().trim(), resetCode);
+
+    // E-Mail senden
+    await mail.sendPasswordResetEmail(email, resetCode);
+
+    res.json({ 
+      message: 'Falls ein Account mit dieser E-Mail existiert, wurde ein Reset-Code gesendet.',
+      email: email.toLowerCase().trim()
+    });
+
+  } catch (error) {
+    console.error('Forgot-Password-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Anfrage fehlgeschlagen' 
+    });
+  }
+});
+
+/**
+ * POST /api/reset-password
+ * Passwort mit Code zurücksetzen
+ */
+app.post('/api/reset-password', async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'E-Mail, Code und neues Passwort sind erforderlich' 
+      });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({ 
+        error: 'Passwort zu kurz',
+        message: 'Das Passwort muss mindestens 4 Zeichen haben' 
+      });
+    }
+
+    // User suchen
+    const user = db.findUserByEmail(email.toLowerCase().trim());
+    if (!user) {
+      return res.status(400).json({ 
+        error: 'Ungültig',
+        message: 'E-Mail oder Code ungültig' 
+      });
+    }
+
+    // Code prüfen
+    if (String(user.verification_code) !== String(code).trim()) {
+      return res.status(400).json({ 
+        error: 'Ungültiger Code',
+        message: 'Der eingegebene Code ist falsch' 
+      });
+    }
+
+    // Neues Passwort hashen und speichern
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    db.updatePassword(email.toLowerCase().trim(), passwordHash);
+
+    // Code löschen
+    db.updateVerificationCode(email.toLowerCase().trim(), null);
+
+    res.json({ 
+      message: 'Passwort erfolgreich geändert. Du kannst dich jetzt anmelden.'
+    });
+
+  } catch (error) {
+    console.error('Reset-Password-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Passwort-Reset fehlgeschlagen' 
+    });
+  }
+});
+
 // ==================== Poll Endpoints ====================
 
 /**

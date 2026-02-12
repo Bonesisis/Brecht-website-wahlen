@@ -167,6 +167,13 @@ function updateVerificationCode(email, newCode) {
   saveDatabase();
 }
 
+function updatePassword(email, newPasswordHash) {
+  const stmt = db.prepare('UPDATE users SET password_hash = ? WHERE email = ?');
+  stmt.run([newPasswordHash, email]);
+  stmt.free();
+  saveDatabase();
+}
+
 // ==================== Poll-Funktionen ====================
 
 function getAllPolls() {
@@ -273,6 +280,7 @@ module.exports = {
   findUserById,
   verifyUser,
   updateVerificationCode,
+  updatePassword,
   // Polls
   getAllPolls,
   getPollById,
