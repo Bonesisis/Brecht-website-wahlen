@@ -30,6 +30,7 @@ const path = require('path');
 // Eigene Module
 const db = require('./db');
 const auth = require('./auth');
+const mail = require('./mail');
 
 // Express-App erstellen
 const app = express();
@@ -92,11 +93,11 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
-    // E-Mail-Format prüfen (nur @brecht-schulen.de mit Punkt vor @)
+    // E-Mail-Format prüfen (nur @brecht-schule.hamburg)
     if (!auth.isValidSchoolEmail(email)) {
       return res.status(400).json({ 
         error: 'Ungültige E-Mail',
-        message: 'Bitte nutze deine Schul-E-Mail im Format vorname.nachname@brecht-schulen.de' 
+        message: 'Bitte nutze deine Schul-E-Mail (vorname.nachname@brecht-schule.hamburg oder nachname@brecht-schule.hamburg)' 
       });
     }
 
@@ -116,15 +117,11 @@ app.post('/api/register', async (req, res) => {
         const newCode = generateVerificationCode();
         db.updateVerificationCode(email.toLowerCase().trim(), newCode);
         
-        console.log('');
-        console.log('═══════════════════════════════════════════════');
-        console.log(`  BESTÄTIGUNGSCODE für ${email}`);
-        console.log(`  Code: ${newCode}`);
-        console.log('═══════════════════════════════════════════════');
-        console.log('');
+        // E-Mail mit Code senden
+        await mail.sendVerificationEmail(email, newCode);
         
         return res.status(200).json({ 
-          message: 'Neuer Bestätigungscode gesendet',
+          message: 'Neuer Bestätigungscode wurde an deine E-Mail gesendet',
           requiresVerification: true,
           email: email.toLowerCase().trim()
         });
@@ -144,16 +141,11 @@ app.post('/api/register', async (req, res) => {
     // User erstellen (noch nicht verifiziert)
     const userId = db.createUser(email.toLowerCase().trim(), passwordHash, verificationCode);
 
-    // Code in Konsole ausgeben (in Produktion: E-Mail senden)
-    console.log('');
-    console.log('═══════════════════════════════════════════════');
-    console.log(`  BESTÄTIGUNGSCODE für ${email}`);
-    console.log(`  Code: ${verificationCode}`);
-    console.log('═══════════════════════════════════════════════');
-    console.log('');
+    // E-Mail mit Bestätigungscode senden
+    await mail.sendVerificationEmail(email, verificationCode);
 
     res.status(201).json({ 
-      message: 'Registrierung erfolgreich. Bitte bestätige deine E-Mail.',
+      message: 'Registrierung erfolgreich. Bitte prüfe deine E-Mails für den Bestätigungscode.',
       requiresVerification: true,
       email: email.toLowerCase().trim()
     });
