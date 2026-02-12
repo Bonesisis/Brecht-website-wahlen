@@ -8,31 +8,35 @@
 </head>
 <body data-page="test-abstimmung">
   <div class="container">
-    <header class="header">
-      <a href="./index.html" class="brand">
-        <div class="brand__badge">BW</div>
-        <div class="brand__text">
-          <div class="brand__title">Brechtwahl</div>
-          <div class="brand__subtitle">Test-Abstimmung</div>
-        </div>
-      </a>
-      <nav class="nav">
-        <a href="./admin.html">Admin</a>
-        <a href="./polls.html">Alle Abstimmungen</a>
-      </nav>
-    </header>
-
-    <section class="card card--highlight">
-      <h2>so wie isses</h2>
+    <!-- vereinfachte ovale Leiste statt Header/Links -->
+    <div class="top-oval" aria-hidden="true">Brechtwahl</div>
+    
+    <section class="card card--highlight glass-card" id="test-card-1">
+      <h2>Test-Abstimmung</h2>
       <p>Hier kannst du Test-Stimmen abgeben (ohne Anmeldung).</p>
-      <div id="test-buttons" class="mb-2">
+      <div id="test-buttons" class="mb-2 vote-buttons">
         <button id="test-yes" class="button">Ja</button>
         <button id="test-no" class="button button--outline">Nein</button>
       </div>
       <div id="test-results">
-        <strong>Ergebnisse:</strong>
+        <strong class="sr-only">Ergebnisse:</strong>
         <div id="test-counts">Lade...</div>
         <div id="test-winner"></div>
+      </div>
+    </section>
+
+    <!-- Kopierter zweiter Kasten (Inhalt identisch, IDs angepasst) -->
+    <section class="card card--highlight glass-card" id="test-card-2">
+      <h2>Test-Abstimmung — Kopie</h2>
+      <p>Gleiche Test‑UI (zweiter Kasten als Kopie).</p>
+      <div id="test-buttons-2" class="mb-2 vote-buttons">
+        <button id="test-yes-2" class="button">Ja</button>
+        <button id="test-no-2" class="button button--outline">Nein</button>
+      </div>
+      <div id="test-results-2">
+        <strong class="sr-only">Ergebnisse:</strong>
+        <div id="test-counts-2">Lade...</div>
+        <div id="test-winner-2"></div>
       </div>
     </section>
 
@@ -45,33 +49,63 @@
   <script>
     const TEST_API = '/api/test';
 
-    async function updateTestResults() {
-      try {
-        const res = await fetch(`${TEST_API}/votes`);
-        const data = await res.json();
-        document.getElementById('test-counts').textContent = `Ja: ${data.yes} · Nein: ${data.no} · Gesamt: ${data.total}`;
-        const winner = data.yes > data.no ? 'Ja liegt vorne' : (data.no > data.yes ? 'Nein liegt vorne' : 'Unentschieden');
-        document.getElementById('test-winner').textContent = winner;
-      } catch (e) {
-        document.getElementById('test-counts').textContent = 'Fehler beim Laden';
+    function renderCounts(targetCountsEl, targetWinnerEl, data) {
+      const total = data.total || 0;
+      targetCountsEl.textContent = total === 0 ? 'Keine Stimmen' : `Ja: ${data.yes} · Nein: ${data.no} · Gesamt: ${total}`;
+      targetWinnerEl.classList.remove('win');
+      if (total > 0) {
+        const winnerText = data.yes > data.no ? 'Ja liegt vorne' : (data.no > data.yes ? 'Nein liegt vorne' : 'Unentschieden');
+        targetWinnerEl.textContent = winnerText;
+        if (data.yes !== data.no) targetWinnerEl.classList.add('win');
+      } else {
+        targetWinnerEl.textContent = '';
       }
     }
 
-    async function postTestVote(choice) {
+    async function updateTestResults() {
       try {
-        await fetch(`${TEST_API}/vote`, {
+        const res = await fetch(`${TEST_API}/votes`);
+        if (!res.ok) throw new Error('Netzwerk');
+        const data = await res.json();
+        // update both cards
+        renderCounts(document.getElementById('test-counts'), document.getElementById('test-winner'), data);
+        renderCounts(document.getElementById('test-counts-2'), document.getElementById('test-winner-2'), data);
+      } catch (e) {
+        console.error('Test-API nicht erreichbar:', e);
+        document.getElementById('test-counts').textContent = 'Daten nicht verfügbar';
+        document.getElementById('test-counts-2').textContent = 'Daten nicht verfügbar';
+        document.getElementById('test-winner').textContent = '';
+        document.getElementById('test-winner-2').textContent = '';
+      }
+    }
+
+    async function postTestVote(choice, buttons) {
+      // buttons: array of button elements to disable/enable
+      buttons.forEach(b => b.disabled = true);
+      try {
+        const res = await fetch(`${TEST_API}/vote`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ choice })
         });
-        updateTestResults();
+        if (!res.ok) throw new Error('submit-failed');
+        await updateTestResults();
       } catch (e) {
-        alert('Fehler beim Senden der Stimme');
+        console.error('Fehler beim Senden der Stimme', e);
+        const fallback = document.getElementById('test-counts');
+        if (fallback) fallback.textContent = 'Senden fehlgeschlagen';
+      } finally {
+        buttons.forEach(b => b.disabled = false);
       }
     }
 
-    document.getElementById('test-yes').addEventListener('click', () => postTestVote('yes'));
-    document.getElementById('test-no').addEventListener('click', () => postTestVote('no'));
+    // Event listeners für ersten Kasten
+    document.getElementById('test-yes').addEventListener('click', () => postTestVote('yes', [document.getElementById('test-yes'), document.getElementById('test-no')]));
+    document.getElementById('test-no').addEventListener('click', () => postTestVote('no', [document.getElementById('test-yes'), document.getElementById('test-no')]));
+
+    // Event listeners für zweiten Kasten
+    document.getElementById('test-yes-2').addEventListener('click', () => postTestVote('yes', [document.getElementById('test-yes-2'), document.getElementById('test-no-2')]));
+    document.getElementById('test-no-2').addEventListener('click', () => postTestVote('no', [document.getElementById('test-yes-2'), document.getElementById('test-no-2')]));
 
     updateTestResults();
     setInterval(updateTestResults, 3000);
