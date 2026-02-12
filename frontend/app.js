@@ -1,5 +1,5 @@
 const USE_MOCK = false;
-const API_BASE = "http://localhost:3000/api";
+const API_BASE = "/api";
 const STORAGE_KEYS = {
   token: "bw_token",
   userEmail: "bw_userEmail",
@@ -200,10 +200,12 @@ function seedPolls() {
 
 // ==================== Auth Functions ====================
 function isValidSchoolEmail(email) {
-  // Must end with @brecht-schulen.de
-  // Must have at least one dot before @
-  const regex = /^[a-zA-ZäöüÄÖÜß]+\.[a-zA-ZäöüÄÖÜß]+@brecht-schulen\.de$/i;
-  return regex.test(email.trim());
+  // Must end with @brecht-schule.hamburg
+  // Either vorname.nachname@ (students) or just nachname@ (teachers)
+  const schuelerRegex = /^[a-zA-ZäöüÄÖÜß-]+\.[a-zA-ZäöüÄÖÜß-]+@brecht-schule\.hamburg$/i;
+  const lehrerRegex = /^[a-zA-ZäöüÄÖÜß-]+@brecht-schule\.hamburg$/i;
+  const trimmed = email.trim();
+  return schuelerRegex.test(trimmed) || lehrerRegex.test(trimmed);
 }
 
 function isLoggedIn() {
@@ -342,7 +344,7 @@ function initRegister() {
 
     // Validate email format
     if (!isValidSchoolEmail(email)) {
-      showAlert(card, "Bitte nutze deine Schul-E-Mail im Format vorname.nachname@brecht-schulen.de");
+      showAlert(card, "Bitte nutze deine Schul-E-Mail (vorname.nachname@brecht-schule.hamburg oder nachname@brecht-schule.hamburg)");
       emailInput.classList.add("input--error");
       return;
     }

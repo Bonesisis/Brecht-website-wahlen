@@ -92,14 +92,17 @@ function adminRequired(req, res, next) {
 }
 
 /**
- * E-Mail-Validierung für Brecht-Schulen
- * Format: vorname.nachname@brecht-schulen.de
+ * E-Mail-Validierung für Brecht-Schule Hamburg
+ * Format: vorname.nachname@brecht-schule.hamburg (Schüler)
+ * Format: nachname@brecht-schule.hamburg (Lehrer)
  */
 function isValidSchoolEmail(email) {
-  // Muss auf @brecht-schulen.de enden
-  // Muss mindestens einen Punkt vor @ haben (Vorname.Nachname)
-  const regex = /^[a-zA-ZäöüÄÖÜß]+\.[a-zA-ZäöüÄÖÜß]+@brecht-schulen\.de$/i;
-  return regex.test(email.trim());
+  // Muss auf @brecht-schule.hamburg enden
+  // Entweder vorname.nachname@ (Schüler) oder nur nachname@ (Lehrer)
+  const schuelerRegex = /^[a-zA-ZäöüÄÖÜß-]+\.[a-zA-ZäöüÄÖÜß-]+@brecht-schule\.hamburg$/i;
+  const lehrerRegex = /^[a-zA-ZäöüÄÖÜß-]+@brecht-schule\.hamburg$/i;
+  const trimmed = email.trim();
+  return schuelerRegex.test(trimmed) || lehrerRegex.test(trimmed);
 }
 
 module.exports = {
