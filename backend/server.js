@@ -785,7 +785,3 @@ startServer().catch(err => {
   console.error('Fehler beim Starten:', err);
   process.exit(1);
 });
-
-// Test-API einbinden
-const testRouter = require('./routes/test');
-app.use('/api/test', testRouter);
