@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Test-Abstimmung</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test-Abstimmung · Brechtwahl</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
+<body data-page="test-abstimmung">
   <div class="container">
     <header class="header">
       <a href="./index.html" class="brand">
@@ -16,62 +16,65 @@
           <div class="brand__subtitle">Test-Abstimmung</div>
         </div>
       </a>
+      <nav class="nav">
+        <a href="./admin.html">Admin</a>
+        <a href="./polls.html">Alle Abstimmungen</a>
+      </nav>
     </header>
 
-    <main class="card card--highlight">
-      <h2>Test-Abstimmung</h2>
-      <p class="mb-2">Wähle eine Option und sende deine Stimme (Test, keine Authentifizierung).</p>
-
-      <div id="buttons" class="mb-3">
-        <button id="btn-yes" class="button">Ja</button>
-        <button id="btn-no" class="button button--outline">Nein</button>
+    <section class="card card--highlight">
+      <h2>hmmmmm</h2>
+      <p>Hier kannst du Test-Stimmen abgeben (ohne Anmeldung).</p>
+      <div id="test-buttons" class="mb-2">
+        <button id="test-yes" class="button">Ja</button>
+        <button id="test-no" class="button button--outline">Nein</button>
       </div>
-
-      <div id="result" class="card card--soft">
+      <div id="test-results">
         <strong>Ergebnisse:</strong>
-        <div id="counts">Lade...</div>
-        <div id="winner"></div>
+        <div id="test-counts">Lade...</div>
+        <div id="test-winner"></div>
       </div>
-    </main>
+    </section>
 
-    <footer class="footer">Nur ein einfacher Test — nicht produktiv.</footer>
+    <footer class="footer">
+      Brechtwahl · Demokratieprojekt der Brecht Schule Hamburg
+    </footer>
   </div>
 
+  <script src="./app.js"></script>
   <script>
-    const API = '/api/test';
+    const TEST_API = '/api/test';
 
-    async function fetchCounts() {
+    async function updateTestResults() {
       try {
-        const res = await fetch(`${API}/votes`);
+        const res = await fetch(`${TEST_API}/votes`);
         const data = await res.json();
-        document.getElementById('counts').textContent = `Ja: ${data.yes} · Nein: ${data.no} · Gesamt: ${data.total}`;
+        document.getElementById('test-counts').textContent = `Ja: ${data.yes} · Nein: ${data.no} · Gesamt: ${data.total}`;
         const winner = data.yes > data.no ? 'Ja liegt vorne' : (data.no > data.yes ? 'Nein liegt vorne' : 'Unentschieden');
-        document.getElementById('winner').textContent = winner;
+        document.getElementById('test-winner').textContent = winner;
       } catch (e) {
-        document.getElementById('counts').textContent = 'Fehler beim Laden der Ergebnisse';
+        document.getElementById('test-counts').textContent = 'Fehler beim Laden';
       }
     }
 
-    async function sendVote(choice) {
+    async function postTestVote(choice) {
       try {
-        const res = await fetch(`${API}/vote`, {
+        await fetch(`${TEST_API}/vote`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ choice })
         });
-        if (!res.ok) throw new Error('Vote failed');
-        await fetchCounts();
+        updateTestResults();
       } catch (e) {
-        alert('Stimme konnte nicht gesendet werden');
+        alert('Fehler beim Senden der Stimme');
       }
     }
 
-    document.getElementById('btn-yes').addEventListener('click', () => sendVote('yes'));
-    document.getElementById('btn-no').addEventListener('click', () => sendVote('no'));
+    document.getElementById('test-yes').addEventListener('click', () => postTestVote('yes'));
+    document.getElementById('test-no').addEventListener('click', () => postTestVote('no'));
 
-    // Polling
-    fetchCounts();
-    setInterval(fetchCounts, 3000);
+    updateTestResults();
+    setInterval(updateTestResults, 3000);
   </script>
 </body>
 </html>

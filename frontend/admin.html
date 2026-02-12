@@ -55,12 +55,8 @@
     <section class="grid" data-admin-list></section>
 
     <section class="card card--soft" id="test-vote-card">
-      <h3>Test-Abstimmung (Frontend)</h3>
-      <p>Einfach testen — Stimmen ohne Anmeldung.</p>
-      <div id="test-buttons" class="mb-2">
-        <button id="test-yes" class="button">Ja</button>
-        <button id="test-no" class="button button--outline">Nein</button>
-      </div>
+      <h3>Test-Abstimmung (Status)</h3>
+      <p>Übersicht über die Test-Abstimmung. Zum Abstimmen öffne <a href="./test_abstimmung.html" target="_blank" rel="noopener">test_abstimmung.html</a>.</p>
       <div id="test-results">
         <strong>Ergebnisse:</strong>
         <div id="test-counts">Lade...</div>
@@ -89,22 +85,6 @@
         document.getElementById('test-counts').textContent = 'Fehler beim Laden';
       }
     }
-
-    async function postTestVote(choice) {
-      try {
-        await fetch(`${TEST_API}/vote`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ choice })
-        });
-        updateTestResults();
-      } catch (e) {
-        alert('Fehler beim Senden der Stimme');
-      }
-    }
-
-    document.getElementById('test-yes').addEventListener('click', () => postTestVote('yes'));
-    document.getElementById('test-no').addEventListener('click', () => postTestVote('no'));
 
     updateTestResults();
     setInterval(updateTestResults, 3000);
