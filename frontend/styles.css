@@ -708,6 +708,22 @@ hr {
   width: max-content;
 }
 
+.footer__admin {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.7rem;
+}
+
+.footer__admin a {
+  color: rgba(255,255,255,0.4);
+  text-decoration: none;
+}
+
+.footer__admin a:hover {
+  color: rgba(255,255,255,0.6);
+  text-decoration: underline;
+}
+
 /* responsive footer */
 @media (max-width: 540px) {
   .footer { width: calc(100% - 32px); display: block; margin: 18px auto; }
