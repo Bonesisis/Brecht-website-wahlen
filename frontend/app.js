@@ -585,17 +585,16 @@ async function initVote() {
   status.textContent = poll.active ? "Aktiv" : "Geschlossen";
   status.className = `badge ${poll.active ? "badge--active" : "badge--closed"}`;
 
-  // Zeige erst Voting-Buttons, nach Abstimmung oder bei geschlossener Poll die Ergebnisse
-  let hasVotedAlready = false;
-  voteSection.classList.remove("hidden");
-  resultSection.classList.add("hidden");
-
-  const renderResults = async () => {
+  const renderResults = async (showVotedMessage = false) => {
     const results = await api.getResults(pollId);
     const yesPercent = results.total === 0 ? 0 : Math.round((results.yes / results.total) * 100);
     const noPercent = results.total === 0 ? 0 : 100 - yesPercent;
     
-    info.textContent = `${results.total} Stimmen insgesamt`;
+    if (showVotedMessage) {
+      info.textContent = `Du hast bereits abgestimmt · ${results.total} Stimmen insgesamt`;
+    } else {
+      info.textContent = `${results.total} Stimmen insgesamt`;
+    }
     yesBar.style.width = `${yesPercent}%`;
     noBar.style.width = `${noPercent}%`;
     yesPercentEl.textContent = `${yesPercent}% Ja (${results.yes})`;
@@ -610,25 +609,37 @@ async function initVote() {
     return;
   }
 
+  // Prüfe ob User bereits abgestimmt hat
+  const userEmail = getRegisteredEmail();
+  const alreadyVoted = userEmail && hasVoted(poll, userEmail);
+  
+  if (alreadyVoted) {
+    voteSection.classList.add("hidden");
+    resultSection.classList.remove("hidden");
+    await renderResults(true);
+    return;
+  }
+
+  // Zeige Voting-Buttons
+  voteSection.classList.remove("hidden");
+  resultSection.classList.add("hidden");
+
   const buttons = document.querySelectorAll("[data-vote]");
   buttons.forEach((button) => {
     button.addEventListener("click", async () => {
-      if (hasVotedAlready) return;
       const choice = button.dataset.vote;
       
       try {
         await api.vote(pollId, choice);
-        hasVotedAlready = true;
         voteSection.classList.add("hidden");
         resultSection.classList.remove("hidden");
         await renderResults();
       } catch (error) {
         // Wenn bereits abgestimmt, zeige Ergebnisse
         if (error.message.includes("bereits")) {
-          hasVotedAlready = true;
           voteSection.classList.add("hidden");
           resultSection.classList.remove("hidden");
-          await renderResults();
+          await renderResults(true);
         } else {
           showAlert(document.querySelector(".container"), error.message);
         }
