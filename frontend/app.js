@@ -1,5 +1,5 @@
 const USE_MOCK = false;
-const API_BASE = "http://localhost:3000/api";
+const API_BASE = "/api";
 const STORAGE_KEYS = {
   token: "bw_token",
   userEmail: "bw_userEmail",
