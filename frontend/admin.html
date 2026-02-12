@@ -54,11 +54,60 @@
     <h2 class="mt-4 mb-3">Bestehende Abstimmungen</h2>
     <section class="grid" data-admin-list></section>
 
+    <section class="card card--soft" id="test-vote-card">
+      <h3>Test-Abstimmung (Frontend)</h3>
+      <p>Einfach testen — Stimmen ohne Anmeldung.</p>
+      <div id="test-buttons" class="mb-2">
+        <button id="test-yes" class="button">Ja</button>
+        <button id="test-no" class="button button--outline">Nein</button>
+      </div>
+      <div id="test-results">
+        <strong>Ergebnisse:</strong>
+        <div id="test-counts">Lade...</div>
+        <div id="test-winner"></div>
+      </div>
+    </section>
+
     <footer class="footer">
       Brechtwahl · Demokratieprojekt der Brecht Schule Hamburg
     </footer>
   </div>
 
   <script src="./app.js"></script>
+
+  <script>
+    const TEST_API = '/api/test';
+
+    async function updateTestResults() {
+      try {
+        const res = await fetch(`${TEST_API}/votes`);
+        const data = await res.json();
+        document.getElementById('test-counts').textContent = `Ja: ${data.yes} · Nein: ${data.no} · Gesamt: ${data.total}`;
+        const winner = data.yes > data.no ? 'Ja liegt vorne' : (data.no > data.yes ? 'Nein liegt vorne' : 'Unentschieden');
+        document.getElementById('test-winner').textContent = winner;
+      } catch (e) {
+        document.getElementById('test-counts').textContent = 'Fehler beim Laden';
+      }
+    }
+
+    async function postTestVote(choice) {
+      try {
+        await fetch(`${TEST_API}/vote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ choice })
+        });
+        updateTestResults();
+      } catch (e) {
+        alert('Fehler beim Senden der Stimme');
+      }
+    }
+
+    document.getElementById('test-yes').addEventListener('click', () => postTestVote('yes'));
+    document.getElementById('test-no').addEventListener('click', () => postTestVote('no'));
+
+    updateTestResults();
+    setInterval(updateTestResults, 3000);
+  </script>
 </body>
 </html>
