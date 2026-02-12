@@ -645,9 +645,6 @@ async function initAdmin() {
   const adminCodeInput = document.querySelector("[data-admin-code]");
   const container = document.querySelector(".container");
 
-  // Admin-Code aus localStorage (einmal eingeben, dann speichern)
-  let adminCode = localStorage.getItem("bw_adminCode") || "";
-
   const render = async () => {
     try {
       const polls = await api.getPolls();
@@ -686,11 +683,8 @@ async function initAdmin() {
           const id = button.dataset.id;
           const action = button.dataset.action;
           
-          if (!adminCode) {
-            adminCode = prompt("Bitte Admin-Code eingeben:");
-            if (!adminCode) return;
-            localStorage.setItem("bw_adminCode", adminCode);
-          }
+          const adminCode = prompt("Bitte Admin-Code eingeben:");
+          if (!adminCode) return;
 
           try {
             if (action === "toggle") {
@@ -705,11 +699,6 @@ async function initAdmin() {
             render();
           } catch (error) {
             showAlert(container, error.message);
-            // Bei falschem Code, Code löschen
-            if (error.message.includes("Admin")) {
-              localStorage.removeItem("bw_adminCode");
-              adminCode = "";
-            }
           }
         });
       });
@@ -723,11 +712,8 @@ async function initAdmin() {
     const title = titleInput.value.trim();
     if (!title) return;
 
-    if (!adminCode) {
-      adminCode = prompt("Bitte Admin-Code eingeben:");
-      if (!adminCode) return;
-      localStorage.setItem("bw_adminCode", adminCode);
-    }
+    const adminCode = prompt("Bitte Admin-Code eingeben:");
+    if (!adminCode) return;
 
     try {
       await api.createPoll(title, adminCode);
@@ -735,10 +721,6 @@ async function initAdmin() {
       render();
     } catch (error) {
       showAlert(container, error.message);
-      if (error.message.includes("Admin")) {
-        localStorage.removeItem("bw_adminCode");
-        adminCode = "";
-      }
     }
   });
 
