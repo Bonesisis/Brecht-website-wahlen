@@ -46,12 +46,9 @@ const BCRYPT_ROUNDS = 10;
 app.use(express.json());
 
 // CORS konfigurieren
-app.use(cors({
-  origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
-  credentials: true,
-  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Code']
-}));
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 // Request-Logging (einfach)
 app.use((req, res, next) => {
