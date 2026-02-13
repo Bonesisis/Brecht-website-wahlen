@@ -6,7 +6,6 @@
   <title>Brechtwahl · Live-Abstimmung</title>
   <link rel="stylesheet" href="./styles.css" />
   <style>
-    /* Live-Poll spezifische Styles */
     .live-container {
       max-width: 800px;
       margin: 40px auto;
@@ -27,72 +26,109 @@
       font-size: 0.95rem;
     }
 
-    .live-results {
+    /* === Balkendiagramm === */
+    .bar-chart {
       display: flex;
-      flex-direction: column;
-      gap: 28px;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 48px;
+      height: 320px;
+      padding: 0 20px 0;
+      margin-bottom: 12px;
     }
 
-    .live-result-item {
+    .bar-column {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-    }
-
-    .live-result-label {
-      display: flex;
-      justify-content: space-between;
       align-items: center;
-      font-weight: 600;
-      color: #2d5a3d;
+      gap: 12px;
+      flex: 0 0 120px;
     }
 
-    .live-result-percentage {
-      font-size: 1.2rem;
+    .bar-value {
+      font-size: 1.4rem;
       font-weight: 800;
       color: #2d5a3d;
     }
 
-    .live-result-bar-container {
-      background: #f0f0f0;
-      border-radius: 8px;
-      height: 40px;
+    .bar-wrapper {
+      width: 100%;
+      height: 260px;
+      display: flex;
+      align-items: flex-end;
+      background: #f5f5f5;
+      border-radius: 8px 8px 0 0;
       overflow: hidden;
       border: 2px solid #e0e0e0;
+      border-bottom: none;
     }
 
-    .live-result-bar {
-      height: 100%;
-      background: linear-gradient(90deg, #2d5a3d, #3d7a4d);
-      border-radius: 6px;
+    .bar-fill {
+      width: 100%;
+      border-radius: 6px 6px 0 0;
+      transition: height 800ms cubic-bezier(.25, .46, .45, .94);
+      min-height: 4px;
       display: flex;
       align-items: center;
-      justify-content: flex-end;
-      padding-right: 12px;
+      justify-content: center;
+    }
+
+    .bar-fill.yes-bar {
+      background: linear-gradient(180deg, #3d7a4d, #2d5a3d);
+    }
+
+    .bar-fill.no-bar {
+      background: linear-gradient(180deg, #b0b0b0, #888);
+    }
+
+    .bar-fill-label {
       color: white;
       font-weight: 700;
-      font-size: 0.9rem;
-      transition: width 800ms cubic-bezier(.25, .46, .45, .94);
-      min-width: 0;
+      font-size: 0.95rem;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
     }
 
-    .live-result-bar.no-bar {
-      background: linear-gradient(90deg, #999, #777);
+    .bar-label {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #333;
+      padding: 8px 0;
+      border-top: 3px solid #2d5a3d;
+      width: 100%;
+      text-align: center;
     }
 
-    .live-result-count {
+    .bar-label.no-label {
+      border-top-color: #888;
+    }
+
+    .bar-count {
       font-size: 0.9rem;
       color: #666;
     }
 
+    /* === Total / Status === */
     .live-total {
       text-align: center;
-      margin-top: 32px;
-      padding-top: 24px;
+      margin-top: 24px;
+      padding-top: 20px;
       border-top: 2px solid #e0e0e0;
       font-size: 1.05rem;
       color: #2d5a3d;
       font-weight: 700;
+    }
+
+    .live-status {
+      text-align: center;
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: #999;
+    }
+
+    .live-error {
+      text-align: center;
+      color: #999;
+      padding: 60px 0;
     }
 
     @media (max-width: 540px) {
@@ -102,15 +138,24 @@
       }
 
       .live-header h1 {
-        font-size: 1.6rem;
+        font-size: 1.5rem;
       }
 
-      .live-result-bar-container {
-        height: 36px;
+      .bar-chart {
+        gap: 24px;
+        height: 260px;
       }
 
-      .live-result-percentage {
-        font-size: 1.1rem;
+      .bar-column {
+        flex: 0 0 90px;
+      }
+
+      .bar-wrapper {
+        height: 200px;
+      }
+
+      .bar-value {
+        font-size: 1.2rem;
       }
     }
   </style>
@@ -132,15 +177,16 @@
 
     <div class="live-container">
       <div class="live-header">
-        <h1>Live-Abstimmung</h1>
-        <p id="live-poll-title">Lädt...</p>
+        <h1 id="live-poll-title">Live-Abstimmung</h1>
+        <p id="live-poll-subtitle">Lädt...</p>
       </div>
 
-      <div class="live-results" id="live-results">
-        <p style="text-align: center; color: #999;">Keine Daten verfügbar</p>
+      <div id="live-chart-area">
+        <p class="live-error">Keine Daten verfügbar</p>
       </div>
 
       <div class="live-total" id="live-total"></div>
+      <div class="live-status" id="live-status"></div>
     </div>
 
     <footer class="footer">
@@ -150,66 +196,84 @@
 
   <script src="./app.js"></script>
   <script>
-    const LIVE_API = '/api/test';
+    const API_BASE = '/api';
+
+    // Poll-ID aus URL-Parameter lesen: live_poll.html?id=xxx
+    function getPollId() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('id');
+    }
 
     async function loadLiveData() {
+      const pollId = getPollId();
+
+      if (!pollId) {
+        document.getElementById('live-poll-subtitle').textContent = 'Keine Abstimmungs-ID angegeben.';
+        document.getElementById('live-chart-area').innerHTML =
+          '<p class="live-error">Bitte öffne die Seite mit ?id=POLL_ID</p>';
+        return;
+      }
+
       try {
-        const res = await fetch(`${LIVE_API}/votes`);
-        if (!res.ok) throw new Error('API error');
-        const data = await res.json();
+        // Poll-Info laden
+        const pollRes = await fetch(`${API_BASE}/test-poll/${pollId}`);
+        if (!pollRes.ok) throw new Error('Abstimmung nicht gefunden');
+        const poll = await pollRes.json();
 
-        const { yes, no, total } = data;
+        document.getElementById('live-poll-title').textContent = poll.title || 'Live-Abstimmung';
+        document.getElementById('live-poll-subtitle').textContent = poll.question || poll.title;
 
-        // Berechne Prozentsätze
+        // Ergebnisse laden
+        const resultsRes = await fetch(`${API_BASE}/test-results?poll_id=${pollId}`);
+        if (!resultsRes.ok) throw new Error('Ergebnisse nicht verfügbar');
+        const results = await resultsRes.json();
+
+        const { yes, no, total } = results;
         const yesPercent = total > 0 ? Math.round((yes / total) * 100) : 0;
         const noPercent = total > 0 ? Math.round((no / total) * 100) : 0;
 
-        // Aktualisiere Title
-        document.getElementById('live-poll-title').textContent = 
-          total === 0 ? 'Keine Stimmen noch' : `${total} Stimmen insgesamt`;
-
-        // Aktualisiere Balken
-        const resultsContainer = document.getElementById('live-results');
-        resultsContainer.innerHTML = `
-          <div class="live-result-item">
-            <div class="live-result-label">
-              <span>Ja</span>
-              <span class="live-result-percentage">${yesPercent}%</span>
-            </div>
-            <div class="live-result-bar-container">
-              <div class="live-result-bar" style="width: ${yesPercent}%">
-                ${yesPercent > 8 ? yes + ' Stimmen' : ''}
+        // Balkendiagramm rendern
+        const chartArea = document.getElementById('live-chart-area');
+        chartArea.innerHTML = `
+          <div class="bar-chart">
+            <div class="bar-column">
+              <div class="bar-value">${yesPercent}%</div>
+              <div class="bar-wrapper">
+                <div class="bar-fill yes-bar" style="height: ${total > 0 ? yesPercent : 0}%">
+                  ${yesPercent > 10 ? '<span class="bar-fill-label">' + yes + '</span>' : ''}
+                </div>
               </div>
+              <div class="bar-label">👍 Ja</div>
+              <div class="bar-count">${yes} ${yes === 1 ? 'Stimme' : 'Stimmen'}</div>
             </div>
-            <div class="live-result-count">${yes} ${yes === 1 ? 'Stimme' : 'Stimmen'}</div>
-          </div>
 
-          <div class="live-result-item">
-            <div class="live-result-label">
-              <span>Nein</span>
-              <span class="live-result-percentage">${noPercent}%</span>
-            </div>
-            <div class="live-result-bar-container">
-              <div class="live-result-bar no-bar" style="width: ${noPercent}%">
-                ${noPercent > 8 ? no + ' Stimmen' : ''}
+            <div class="bar-column">
+              <div class="bar-value">${noPercent}%</div>
+              <div class="bar-wrapper">
+                <div class="bar-fill no-bar" style="height: ${total > 0 ? noPercent : 0}%">
+                  ${noPercent > 10 ? '<span class="bar-fill-label">' + no + '</span>' : ''}
+                </div>
               </div>
+              <div class="bar-label no-label">👎 Nein</div>
+              <div class="bar-count">${no} ${no === 1 ? 'Stimme' : 'Stimmen'}</div>
             </div>
-            <div class="live-result-count">${no} ${no === 1 ? 'Stimme' : 'Stimmen'}</div>
           </div>
         `;
 
-        // Aktualisiere Total
-        const winnerText = yes > no ? 'Ja führt' : (no > yes ? 'Nein führt' : 'Unentschieden');
+        // Total + Gewinner
+        const winnerText = yes > no ? '👍 Ja führt' : (no > yes ? '👎 Nein führt' : 'Unentschieden');
         document.getElementById('live-total').textContent = `Gesamt: ${total} Stimmen · ${winnerText}`;
+        document.getElementById('live-status').textContent =
+          poll.active ? '🟢 Abstimmung läuft · Aktualisiert sich automatisch' : '🔴 Abstimmung beendet';
 
       } catch (e) {
         console.error('Live API failed:', e);
-        document.getElementById('live-results').innerHTML = 
-          '<p style="text-align: center; color: #c00;">Fehler beim Laden der Daten</p>';
+        document.getElementById('live-chart-area').innerHTML =
+          `<p class="live-error">Fehler: ${e.message}</p>`;
       }
     }
 
-    // Initial laden und dann alle 1.5 Sekunden aktualisieren
+    // Initial + alle 1.5 Sekunden aktualisieren
     loadLiveData();
     setInterval(loadLiveData, 1500);
   </script>
