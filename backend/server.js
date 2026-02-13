@@ -28,6 +28,10 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const path = require('path');
+const auth = require('./auth');
+const db = require('./db');
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
 
 // Middleware
 app.use(cors());
