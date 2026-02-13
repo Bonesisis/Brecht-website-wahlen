@@ -30,6 +30,7 @@ const cors = require('cors');
 const path = require('path');
 const auth = require('./auth');
 const db = require('./db');
+const mail = require('./mail');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
@@ -43,6 +44,11 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
   next();
 });
+
+// Hilfsfunktion für Verifizierungscode
+function generateVerificationCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 // ==================== Auth Endpoints ====================
 
@@ -871,11 +877,6 @@ app.get('/api/admin/results', auth.adminRequired, (req, res) => {
   }
 });
 
-// ==================== Test-Abstimmung Route (isoliert, nur für test2abstimmung.html) ====================
-
-const testRouter = require('./routes/test');
-app.use('/api/test', testRouter);
-
 // ==================== Health Check ====================
 
 app.get('/api/health', (req, res) => {
@@ -898,13 +899,19 @@ app.use('/api/*', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log('');
-  console.log('╔════════════════════════════════════════════╗');
-  console.log('║       Brechtwahl Backend gestartet         ║');
-  console.log('╚════════════════════════════════════════════╝');
-  console.log('');
-  console.log(`✓ Server läuft auf Port ${PORT}`);
-  console.log(`✓ API-Basis: http://localhost:${PORT}/api`);
-  console.log('');
+// Datenbank initialisieren und Server starten
+db.initDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log('');
+    console.log('╔════════════════════════════════════════════╗');
+    console.log('║       Brechtwahl Backend gestartet         ║');
+    console.log('╚════════════════════════════════════════════╝');
+    console.log('');
+    console.log(`✓ Server läuft auf Port ${PORT}`);
+    console.log(`✓ API-Basis: http://localhost:${PORT}/api`);
+    console.log('');
+  });
+}).catch(err => {
+  console.error('Fehler beim Starten:', err);
+  process.exit(1);
 });
