@@ -123,12 +123,13 @@ const api = {
   },
 
   // Admin (mit Admin-Code Header)
-  async createPoll(title, adminCode) {
+  async createPoll(title, question, adminCode) {
     if (USE_MOCK) {
       const polls = loadPolls();
       const payload = {
         id: crypto.randomUUID(),
         title,
+        question,
         active: true,
         createdAt: new Date().toISOString(),
         votes: { yes: [], no: [] }
@@ -143,7 +144,7 @@ const api = {
         "Content-Type": "application/json",
         "X-Admin-Code": adminCode
       },
-      body: JSON.stringify({ title })
+      body: JSON.stringify({ title, question })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Erstellen fehlgeschlagen");
@@ -180,6 +181,17 @@ const api = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Löschen fehlgeschlagen");
     return data;
+  },
+
+  async hasVoted(pollId) {
+    const token = getToken();
+    if (!token) return false;
+    const res = await fetch(`${API_BASE}/hasvoted?poll_id=${pollId}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.hasVoted;
   }
 };
 
@@ -581,21 +593,20 @@ async function initVote() {
   const noPercentEl = document.querySelector("[data-no-percent]");
 
   title.textContent = poll.title;
-  question.textContent = poll.title; // Backend hat nur title, keine separate question
+  question.textContent = poll.question || poll.title;
   status.textContent = poll.active ? "Aktiv" : "Geschlossen";
   status.className = `badge ${poll.active ? "badge--active" : "badge--closed"}`;
 
-  // Zeige erst Voting-Buttons, nach Abstimmung oder bei geschlossener Poll die Ergebnisse
-  let hasVotedAlready = false;
-  voteSection.classList.remove("hidden");
-  resultSection.classList.add("hidden");
-
-  const renderResults = async () => {
+  const renderResults = async (showVotedMessage = false) => {
     const results = await api.getResults(pollId);
     const yesPercent = results.total === 0 ? 0 : Math.round((results.yes / results.total) * 100);
     const noPercent = results.total === 0 ? 0 : 100 - yesPercent;
     
-    info.textContent = `${results.total} Stimmen insgesamt`;
+    if (showVotedMessage) {
+      info.textContent = `Du hast bereits abgestimmt · ${results.total} Stimmen insgesamt`;
+    } else {
+      info.textContent = `${results.total} Stimmen insgesamt`;
+    }
     yesBar.style.width = `${yesPercent}%`;
     noBar.style.width = `${noPercent}%`;
     yesPercentEl.textContent = `${yesPercent}% Ja (${results.yes})`;
@@ -610,25 +621,36 @@ async function initVote() {
     return;
   }
 
+  // Prüfe ob User bereits abgestimmt hat (über API)
+  const alreadyVoted = await api.hasVoted(pollId);
+  
+  if (alreadyVoted) {
+    voteSection.classList.add("hidden");
+    resultSection.classList.remove("hidden");
+    await renderResults(true);
+    return;
+  }
+
+  // Zeige Voting-Buttons
+  voteSection.classList.remove("hidden");
+  resultSection.classList.add("hidden");
+
   const buttons = document.querySelectorAll("[data-vote]");
   buttons.forEach((button) => {
     button.addEventListener("click", async () => {
-      if (hasVotedAlready) return;
       const choice = button.dataset.vote;
       
       try {
         await api.vote(pollId, choice);
-        hasVotedAlready = true;
         voteSection.classList.add("hidden");
         resultSection.classList.remove("hidden");
         await renderResults();
       } catch (error) {
         // Wenn bereits abgestimmt, zeige Ergebnisse
         if (error.message.includes("bereits")) {
-          hasVotedAlready = true;
           voteSection.classList.add("hidden");
           resultSection.classList.remove("hidden");
-          await renderResults();
+          await renderResults(true);
         } else {
           showAlert(document.querySelector(".container"), error.message);
         }
@@ -642,11 +664,9 @@ async function initAdmin() {
   const list = document.querySelector("[data-admin-list]");
   const form = document.querySelector("[data-admin-form]");
   const titleInput = document.querySelector("[data-admin-title]");
+  const questionInput = document.querySelector("[data-admin-question]");
   const adminCodeInput = document.querySelector("[data-admin-code]");
   const container = document.querySelector(".container");
-
-  // Admin-Code aus localStorage (einmal eingeben, dann speichern)
-  let adminCode = localStorage.getItem("bw_adminCode") || "";
 
   const render = async () => {
     try {
@@ -665,6 +685,7 @@ async function initAdmin() {
           <div class="poll-card__header">
             <div>
               <h3 class="poll-card__title">${poll.title}</h3>
+              ${poll.question ? `<p class="text-small text-muted">${poll.question}</p>` : ''}
             </div>
             <span class="badge ${poll.active ? "badge--active" : "badge--closed"}">
               ${poll.active ? "Aktiv" : "Geschlossen"}
@@ -686,11 +707,8 @@ async function initAdmin() {
           const id = button.dataset.id;
           const action = button.dataset.action;
           
-          if (!adminCode) {
-            adminCode = prompt("Bitte Admin-Code eingeben:");
-            if (!adminCode) return;
-            localStorage.setItem("bw_adminCode", adminCode);
-          }
+          const adminCode = prompt("Bitte Admin-Code eingeben:");
+          if (!adminCode) return;
 
           try {
             if (action === "toggle") {
@@ -705,11 +723,6 @@ async function initAdmin() {
             render();
           } catch (error) {
             showAlert(container, error.message);
-            // Bei falschem Code, Code löschen
-            if (error.message.includes("Admin")) {
-              localStorage.removeItem("bw_adminCode");
-              adminCode = "";
-            }
           }
         });
       });
@@ -721,24 +734,19 @@ async function initAdmin() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const title = titleInput.value.trim();
+    const question = questionInput ? questionInput.value.trim() : "";
     if (!title) return;
 
-    if (!adminCode) {
-      adminCode = prompt("Bitte Admin-Code eingeben:");
-      if (!adminCode) return;
-      localStorage.setItem("bw_adminCode", adminCode);
-    }
+    const adminCode = prompt("Bitte Admin-Code eingeben:");
+    if (!adminCode) return;
 
     try {
-      await api.createPoll(title, adminCode);
+      await api.createPoll(title, question, adminCode);
       titleInput.value = "";
+      if (questionInput) questionInput.value = "";
       render();
     } catch (error) {
       showAlert(container, error.message);
-      if (error.message.includes("Admin")) {
-        localStorage.removeItem("bw_adminCode");
-        adminCode = "";
-      }
     }
   });
 

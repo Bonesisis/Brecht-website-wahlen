@@ -51,6 +51,7 @@ async function initDatabase() {
     CREATE TABLE IF NOT EXISTS polls (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
+      question TEXT,
       active INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
     )
@@ -177,18 +178,19 @@ function updatePassword(email, newPasswordHash) {
 // ==================== Poll-Funktionen ====================
 
 function getAllPolls() {
-  const result = db.exec('SELECT id, title, active FROM polls ORDER BY created_at DESC');
+  const result = db.exec('SELECT id, title, question, active FROM polls ORDER BY created_at DESC');
   if (!result.length) return [];
   
   return result[0].values.map(row => ({
     id: row[0],
     title: row[1],
-    active: row[2]
+    question: row[2],
+    active: row[3]
   }));
 }
 
 function getPollById(id) {
-  const stmt = db.prepare('SELECT id, title, active, created_at FROM polls WHERE id = ?');
+  const stmt = db.prepare('SELECT id, title, question, active, created_at FROM polls WHERE id = ?');
   stmt.bind([id]);
   
   if (stmt.step()) {
@@ -200,9 +202,9 @@ function getPollById(id) {
   return null;
 }
 
-function createPoll(id, title, active) {
-  const stmt = db.prepare('INSERT INTO polls (id, title, active) VALUES (?, ?, ?)');
-  stmt.run([id, title, active ? 1 : 0]);
+function createPoll(id, title, question, active) {
+  const stmt = db.prepare('INSERT INTO polls (id, title, question, active) VALUES (?, ?, ?, ?)');
+  stmt.run([id, title, question || null, active ? 1 : 0]);
   stmt.free();
   saveDatabase();
 }
