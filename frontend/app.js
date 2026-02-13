@@ -180,6 +180,17 @@ const api = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Löschen fehlgeschlagen");
     return data;
+  },
+
+  async hasVoted(pollId) {
+    const token = getToken();
+    if (!token) return false;
+    const res = await fetch(`${API_BASE}/hasvoted?poll_id=${pollId}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.hasVoted;
   }
 };
 
@@ -609,9 +620,8 @@ async function initVote() {
     return;
   }
 
-  // Prüfe ob User bereits abgestimmt hat
-  const userEmail = getRegisteredEmail();
-  const alreadyVoted = userEmail && hasVoted(poll, userEmail);
+  // Prüfe ob User bereits abgestimmt hat (über API)
+  const alreadyVoted = await api.hasVoted(pollId);
   
   if (alreadyVoted) {
     voteSection.classList.add("hidden");

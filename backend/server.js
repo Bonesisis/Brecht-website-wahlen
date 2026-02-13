@@ -545,6 +545,35 @@ app.get('/api/results', (req, res) => {
   }
 });
 
+/**
+ * GET /api/hasvoted
+ * Prüft ob der User bereits abgestimmt hat
+ */
+app.get('/api/hasvoted', auth.authRequired, (req, res) => {
+  try {
+    const { poll_id } = req.query;
+    const userId = req.user.user_id;
+
+    if (!poll_id) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'poll_id ist erforderlich' 
+      });
+    }
+
+    const hasVoted = db.hasUserVoted(poll_id, userId);
+
+    res.json({ hasVoted });
+
+  } catch (error) {
+    console.error('HasVoted-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Prüfung fehlgeschlagen' 
+    });
+  }
+});
+
 // ==================== Admin Endpoints ====================
 
 /**
