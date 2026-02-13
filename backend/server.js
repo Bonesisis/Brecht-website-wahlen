@@ -34,6 +34,8 @@ const mail = require('./mail');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
+const BCRYPT_ROUNDS = 10;
+
 // Middleware
 app.use(cors());
 app.use(express.json());
