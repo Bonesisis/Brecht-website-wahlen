@@ -123,12 +123,13 @@ const api = {
   },
 
   // Admin (mit Admin-Code Header)
-  async createPoll(title, adminCode) {
+  async createPoll(title, question, adminCode) {
     if (USE_MOCK) {
       const polls = loadPolls();
       const payload = {
         id: crypto.randomUUID(),
         title,
+        question,
         active: true,
         createdAt: new Date().toISOString(),
         votes: { yes: [], no: [] }
@@ -143,7 +144,7 @@ const api = {
         "Content-Type": "application/json",
         "X-Admin-Code": adminCode
       },
-      body: JSON.stringify({ title })
+      body: JSON.stringify({ title, question })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Erstellen fehlgeschlagen");
@@ -592,7 +593,7 @@ async function initVote() {
   const noPercentEl = document.querySelector("[data-no-percent]");
 
   title.textContent = poll.title;
-  question.textContent = poll.title; // Backend hat nur title, keine separate question
+  question.textContent = poll.question || poll.title;
   status.textContent = poll.active ? "Aktiv" : "Geschlossen";
   status.className = `badge ${poll.active ? "badge--active" : "badge--closed"}`;
 
@@ -663,6 +664,7 @@ async function initAdmin() {
   const list = document.querySelector("[data-admin-list]");
   const form = document.querySelector("[data-admin-form]");
   const titleInput = document.querySelector("[data-admin-title]");
+  const questionInput = document.querySelector("[data-admin-question]");
   const adminCodeInput = document.querySelector("[data-admin-code]");
   const container = document.querySelector(".container");
 
@@ -683,6 +685,7 @@ async function initAdmin() {
           <div class="poll-card__header">
             <div>
               <h3 class="poll-card__title">${poll.title}</h3>
+              ${poll.question ? `<p class="text-small text-muted">${poll.question}</p>` : ''}
             </div>
             <span class="badge ${poll.active ? "badge--active" : "badge--closed"}">
               ${poll.active ? "Aktiv" : "Geschlossen"}
@@ -731,14 +734,16 @@ async function initAdmin() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const title = titleInput.value.trim();
+    const question = questionInput ? questionInput.value.trim() : "";
     if (!title) return;
 
     const adminCode = prompt("Bitte Admin-Code eingeben:");
     if (!adminCode) return;
 
     try {
-      await api.createPoll(title, adminCode);
+      await api.createPoll(title, question, adminCode);
       titleInput.value = "";
+      if (questionInput) questionInput.value = "";
       render();
     } catch (error) {
       showAlert(container, error.message);

@@ -582,7 +582,7 @@ app.get('/api/hasvoted', auth.authRequired, (req, res) => {
  */
 app.post('/api/admin/polls', auth.adminRequired, (req, res) => {
   try {
-    const { title, active = true } = req.body;
+    const { title, question, active = true } = req.body;
 
     if (!title || title.trim().length === 0) {
       return res.status(400).json({ 
@@ -592,7 +592,7 @@ app.post('/api/admin/polls', auth.adminRequired, (req, res) => {
     }
 
     const pollId = uuidv4();
-    db.createPoll(pollId, title.trim(), active);
+    db.createPoll(pollId, title.trim(), question ? question.trim() : null, active);
 
     const poll = db.getPollById(pollId);
 
