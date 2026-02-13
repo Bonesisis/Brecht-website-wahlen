@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brechtwahl · Test-Abstimmung</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body data-page="test-abstimmung">
+  <div class="container">
+    <header class="header">
+      <a href="./index.html" class="brand">
+        <div class="brand__badge">BW</div>
+        <div class="brand__text">
+          <div class="brand__title">Brechtwahl</div>
+          <div class="brand__subtitle">Test-Abstimmung</div>
+        </div>
+      </a>
+      <nav class="nav">
+        <a href="./index.html">Startseite</a>
+      </nav>
+    </header>
+
+    <section class="card card--highlight">
+      <h2>Test-Abstimmung</h2>
+      <p>Hier kannst du Test-Stimmen abgeben.</p>
+      <div class="vote-buttons">
+        <button id="test-yes" class="button">Ja</button>
+        <button id="test-no" class="button button--secondary">Nein</button>
+      </div>
+      <div id="test-counts">Lade...</div>
+      <div id="test-winner"></div>
+    </section>
+
+    <footer class="footer">
+      Brechtwahl · Demokratieprojekt der Brecht Schule Hamburg
+    </footer>
+  </div>
+
+  <script src="./app.js"></script>
+  <script>
+    const TEST_API = '/api/test';
+
+    async function updateResults() {
+      try {
+        const res = await fetch(`${TEST_API}/votes`);
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+        
+        const total = data.total || 0;
+        document.getElementById('test-counts').textContent = 
+          total === 0 ? 'Keine Stimmen' : `Ja: ${data.yes} · Nein: ${data.no} · Gesamt: ${total}`;
+        
+        const winnerEl = document.getElementById('test-winner');
+        winnerEl.classList.remove('win');
+        if (total > 0) {
+          const text = data.yes > data.no ? 'Ja vorne' : (data.no > data.yes ? 'Nein vorne' : 'Unentschieden');
+          winnerEl.textContent = text;
+          if (data.yes !== data.no) winnerEl.classList.add('win');
+        }
+      } catch (e) {
+        console.error('Test API failed:', e);
+        document.getElementById('test-counts').textContent = 'Fehler beim Laden';
+      }
+    }
+
+    async function vote(choice) {
+      const yesBtn = document.getElementById('test-yes');
+      const noBtn = document.getElementById('test-no');
+      yesBtn.disabled = noBtn.disabled = true;
+      
+      try {
+        const res = await fetch(`${TEST_API}/vote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ choice })
+        });
+        if (res.ok) {
+          await updateResults();
+        } else {
+          throw new Error('Vote failed');
+        }
+      } catch (e) {
+        console.error('Fehler beim Senden:', e);
+      } finally {
+        yesBtn.disabled = noBtn.disabled = false;
+      }
+    }
+
+    document.getElementById('test-yes').addEventListener('click', () => vote('yes'));
+    document.getElementById('test-no').addEventListener('click', () => vote('no'));
+
+    updateResults();
+    setInterval(updateResults, 2000);
+  </script>
+</body>
+</html>

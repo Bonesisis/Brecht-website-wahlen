@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brechtwahl · Live-Abstimmung</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <style>
+    /* Live-Poll spezifische Styles */
+    .live-container {
+      max-width: 800px;
+      margin: 40px auto;
+    }
+
+    .live-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .live-header h1 {
+      color: #2d5a3d;
+      margin-bottom: 8px;
+    }
+
+    .live-header p {
+      color: #666;
+      font-size: 0.95rem;
+    }
+
+    .live-results {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .live-result-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .live-result-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      color: #2d5a3d;
+    }
+
+    .live-result-percentage {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #2d5a3d;
+    }
+
+    .live-result-bar-container {
+      background: #f0f0f0;
+      border-radius: 8px;
+      height: 40px;
+      overflow: hidden;
+      border: 2px solid #e0e0e0;
+    }
+
+    .live-result-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #2d5a3d, #3d7a4d);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 12px;
+      color: white;
+      font-weight: 700;
+      font-size: 0.9rem;
+      transition: width 800ms cubic-bezier(.25, .46, .45, .94);
+      min-width: 0;
+    }
+
+    .live-result-bar.no-bar {
+      background: linear-gradient(90deg, #999, #777);
+    }
+
+    .live-result-count {
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .live-total {
+      text-align: center;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 2px solid #e0e0e0;
+      font-size: 1.05rem;
+      color: #2d5a3d;
+      font-weight: 700;
+    }
+
+    @media (max-width: 540px) {
+      .live-container {
+        margin: 20px auto;
+        padding: 0 16px;
+      }
+
+      .live-header h1 {
+        font-size: 1.6rem;
+      }
+
+      .live-result-bar-container {
+        height: 36px;
+      }
+
+      .live-result-percentage {
+        font-size: 1.1rem;
+      }
+    }
+  </style>
+</head>
+<body data-page="live-poll">
+  <div class="container">
+    <header class="header">
+      <a href="./index.html" class="brand">
+        <div class="brand__badge">BW</div>
+        <div class="brand__text">
+          <div class="brand__title">Brechtwahl</div>
+          <div class="brand__subtitle">Live-Abstimmung</div>
+        </div>
+      </a>
+      <nav class="nav">
+        <a href="./index.html">Startseite</a>
+      </nav>
+    </header>
+
+    <div class="live-container">
+      <div class="live-header">
+        <h1>Live-Abstimmung</h1>
+        <p id="live-poll-title">Lädt...</p>
+      </div>
+
+      <div class="live-results" id="live-results">
+        <p style="text-align: center; color: #999;">Keine Daten verfügbar</p>
+      </div>
+
+      <div class="live-total" id="live-total"></div>
+    </div>
+
+    <footer class="footer">
+      Brechtwahl · Demokratieprojekt der Brecht Schule Hamburg
+    </footer>
+  </div>
+
+  <script src="./app.js"></script>
+  <script>
+    const LIVE_API = '/api/test';
+
+    async function loadLiveData() {
+      try {
+        const res = await fetch(`${LIVE_API}/votes`);
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+
+        const { yes, no, total } = data;
+
+        // Berechne Prozentsätze
+        const yesPercent = total > 0 ? Math.round((yes / total) * 100) : 0;
+        const noPercent = total > 0 ? Math.round((no / total) * 100) : 0;
+
+        // Aktualisiere Title
+        document.getElementById('live-poll-title').textContent = 
+          total === 0 ? 'Keine Stimmen noch' : `${total} Stimmen insgesamt`;
+
+        // Aktualisiere Balken
+        const resultsContainer = document.getElementById('live-results');
+        resultsContainer.innerHTML = `
+          <div class="live-result-item">
+            <div class="live-result-label">
+              <span>Ja</span>
+              <span class="live-result-percentage">${yesPercent}%</span>
+            </div>
+            <div class="live-result-bar-container">
+              <div class="live-result-bar" style="width: ${yesPercent}%">
+                ${yesPercent > 8 ? yes + ' Stimmen' : ''}
+              </div>
+            </div>
+            <div class="live-result-count">${yes} ${yes === 1 ? 'Stimme' : 'Stimmen'}</div>
+          </div>
+
+          <div class="live-result-item">
+            <div class="live-result-label">
+              <span>Nein</span>
+              <span class="live-result-percentage">${noPercent}%</span>
+            </div>
+            <div class="live-result-bar-container">
+              <div class="live-result-bar no-bar" style="width: ${noPercent}%">
+                ${noPercent > 8 ? no + ' Stimmen' : ''}
+              </div>
+            </div>
+            <div class="live-result-count">${no} ${no === 1 ? 'Stimme' : 'Stimmen'}</div>
+          </div>
+        `;
+
+        // Aktualisiere Total
+        const winnerText = yes > no ? 'Ja führt' : (no > yes ? 'Nein führt' : 'Unentschieden');
+        document.getElementById('live-total').textContent = `Gesamt: ${total} Stimmen · ${winnerText}`;
+
+      } catch (e) {
+        console.error('Live API failed:', e);
+        document.getElementById('live-results').innerHTML = 
+          '<p style="text-align: center; color: #c00;">Fehler beim Laden der Daten</p>';
+      }
+    }
+
+    // Initial laden und dann alle 1.5 Sekunden aktualisieren
+    loadLiveData();
+    setInterval(loadLiveData, 1500);
+  </script>
+</body>
+</html>
