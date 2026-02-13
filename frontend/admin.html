@@ -47,6 +47,12 @@
             required 
           />
         </div>
+        <div class="form-group">
+          <label class="form-check">
+            <input type="checkbox" id="is_test" data-admin-is-test />
+            <span>Test-Abstimmung (ohne Login, versteckter Link)</span>
+          </label>
+        </div>
         <button class="button" type="submit">Abstimmung erstellen</button>
       </form>
     </section>
@@ -54,15 +60,8 @@
     <h2 class="mt-4 mb-3">Bestehende Abstimmungen</h2>
     <section class="grid" data-admin-list></section>
 
-    <section class="card card--soft" id="test-vote-card">
-      <h3>Test-Abstimmung (Status)</h3>
-      <p>Übersicht über die Test-Abstimmung. Zum Abstimmen öffne <a href="./test_abstimmung.html" target="_blank" rel="noopener">test_abstimmung.html</a>.</p>
-      <div id="test-results">
-        <strong>Ergebnisse:</strong>
-        <div id="test-counts">Lade...</div>
-        <div id="test-winner"></div>
-      </div>
-    </section>
+    <h2 class="mt-4 mb-3">Test-Abstimmungen</h2>
+    <section class="grid" data-test-poll-list></section>
 
     <footer class="footer">
       Brechtwahl · Demokratieprojekt der Brecht Schule Hamburg
@@ -70,24 +69,5 @@
   </div>
 
   <script src="./app.js"></script>
-
-  <script>
-    const TEST_API = '/api/test';
-
-    async function updateTestResults() {
-      try {
-        const res = await fetch(`${TEST_API}/votes`);
-        const data = await res.json();
-        document.getElementById('test-counts').textContent = `Ja: ${data.yes} · Nein: ${data.no} · Gesamt: ${data.total}`;
-        const winner = data.yes > data.no ? 'Ja liegt vorne' : (data.no > data.yes ? 'Nein liegt vorne' : 'Unentschieden');
-        document.getElementById('test-winner').textContent = winner;
-      } catch (e) {
-        document.getElementById('test-counts').textContent = 'Fehler beim Laden';
-      }
-    }
-
-    updateTestResults();
-    setInterval(updateTestResults, 3000);
-  </script>
 </body>
 </html>

@@ -354,6 +354,28 @@ p {
   box-shadow: 0 0 0 4px rgba(229, 57, 53, 0.1);
 }
 
+.input--small {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+/* Checkbox */
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.925rem;
+  color: var(--text-light);
+}
+
+.form-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--green-500);
+  cursor: pointer;
+}
+
 /* Alerts */
 .alert {
   padding: 16px 20px;

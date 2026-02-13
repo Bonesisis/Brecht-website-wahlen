@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test-Abstimmung · Brechtwahl</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body data-page="test-poll">
+  <div class="container">
+    <header class="header">
+      <a href="#" class="brand">
+        <div class="brand__badge">BW</div>
+        <div class="brand__text">
+          <div class="brand__title">Brechtwahl</div>
+          <div class="brand__subtitle">Test-Abstimmung</div>
+        </div>
+      </a>
+    </header>
+
+    <section class="card card--highlight" data-test-poll-container>
+      <div class="poll-card__header">
+        <h2 class="poll-card__title" data-test-poll-title>Lädt...</h2>
+        <span class="badge" data-test-poll-status>-</span>
+      </div>
+      <p class="poll-card__question mt-2" data-test-poll-question></p>
+
+      <!-- Voting Section -->
+      <div class="mt-4" data-test-vote-section>
+        <p class="text-muted mb-3">Stimme ab:</p>
+        <div class="grid grid--2">
+          <button class="button button--success" data-test-vote="yes">👍 Ja</button>
+          <button class="button button--danger" data-test-vote="no">👎 Nein</button>
+        </div>
+      </div>
+
+      <!-- Results Section -->
+      <div class="mt-4 hidden" data-test-result-section>
+        <p class="text-muted mb-2" data-test-info>Ergebnis</p>
+        <div class="result-bar mb-2">
+          <div class="result-bar__fill result-bar__fill--yes" data-test-yes-bar style="width: 0%"></div>
+        </div>
+        <div class="flex flex--between text-small mb-2">
+          <span data-test-yes-percent>0% Ja</span>
+        </div>
+        <div class="result-bar mb-2">
+          <div class="result-bar__fill result-bar__fill--no" data-test-no-bar style="width: 0%"></div>
+        </div>
+        <div class="flex flex--between text-small">
+          <span data-test-no-percent>0% Nein</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="card card--soft mt-3">
+      <p class="text-small text-muted mb-0">
+        ⚠️ Dies ist eine Test-Abstimmung. Keine Registrierung erforderlich. 
+        Deine Stimme wird anonym gespeichert.
+      </p>
+    </div>
+
+    <footer class="footer">
+      Brechtwahl · Test-Modus
+    </footer>
+  </div>
+
+  <script>
+    const API_BASE = "/api";
+    
+    // Voter-Token generieren oder aus localStorage laden
+    function getVoterToken() {
+      let token = localStorage.getItem("bw_test_voter_token");
+      if (!token) {
+        token = crypto.randomUUID();
+        localStorage.setItem("bw_test_voter_token", token);
+      }
+      return token;
+    }
+
+    async function initTestPoll() {
+      const params = new URLSearchParams(window.location.search);
+      const pollId = params.get("id");
+      
+      const container = document.querySelector("[data-test-poll-container]");
+      const title = document.querySelector("[data-test-poll-title]");
+      const question = document.querySelector("[data-test-poll-question]");
+      const status = document.querySelector("[data-test-poll-status]");
+      const voteSection = document.querySelector("[data-test-vote-section]");
+      const resultSection = document.querySelector("[data-test-result-section]");
+      const info = document.querySelector("[data-test-info]");
+      const yesBar = document.querySelector("[data-test-yes-bar]");
+      const noBar = document.querySelector("[data-test-no-bar]");
+      const yesPercent = document.querySelector("[data-test-yes-percent]");
+      const noPercent = document.querySelector("[data-test-no-percent]");
+
+      if (!pollId) {
+        title.textContent = "Fehler";
+        question.textContent = "Keine Abstimmungs-ID angegeben.";
+        voteSection.classList.add("hidden");
+        return;
+      }
+
+      try {
+        // Poll laden
+        const pollRes = await fetch(`${API_BASE}/test-poll/${pollId}`);
+        if (!pollRes.ok) {
+          throw new Error("Test-Abstimmung nicht gefunden");
+        }
+        const poll = await pollRes.json();
+
+        title.textContent = poll.title;
+        question.textContent = poll.question || poll.title;
+        status.textContent = poll.active ? "Aktiv" : "Geschlossen";
+        status.className = `badge ${poll.active ? "badge--active" : "badge--closed"}`;
+
+        const voterToken = getVoterToken();
+
+        // Render-Ergebnisse Funktion
+        const renderResults = async (showVotedMessage = false) => {
+          const resultsRes = await fetch(`${API_BASE}/test-results?poll_id=${pollId}`);
+          const results = await resultsRes.json();
+          
+          const yesPct = results.total === 0 ? 0 : Math.round((results.yes / results.total) * 100);
+          const noPct = results.total === 0 ? 0 : 100 - yesPct;
+          
+          if (showVotedMessage) {
+            info.textContent = `Du hast abgestimmt · ${results.total} Stimmen insgesamt`;
+          } else {
+            info.textContent = `${results.total} Stimmen insgesamt`;
+          }
+          
+          yesBar.style.width = `${yesPct}%`;
+          noBar.style.width = `${noPct}%`;
+          yesPercent.textContent = `${yesPct}% Ja (${results.yes})`;
+          noPercent.textContent = `${noPct}% Nein (${results.no})`;
+        };
+
+        // Bei geschlossener Poll direkt Ergebnisse zeigen
+        if (!poll.active) {
+          voteSection.classList.add("hidden");
+          resultSection.classList.remove("hidden");
+          await renderResults();
+          return;
+        }
+
+        // Prüfen ob bereits abgestimmt
+        const hasVotedRes = await fetch(`${API_BASE}/test-hasvoted?poll_id=${pollId}&voter_token=${voterToken}`);
+        const hasVotedData = await hasVotedRes.json();
+        
+        if (hasVotedData.hasVoted) {
+          voteSection.classList.add("hidden");
+          resultSection.classList.remove("hidden");
+          await renderResults(true);
+          return;
+        }
+
+        // Vote-Buttons
+        const buttons = document.querySelectorAll("[data-test-vote]");
+        buttons.forEach(button => {
+          button.addEventListener("click", async () => {
+            const choice = button.dataset.testVote;
+            
+            try {
+              const voteRes = await fetch(`${API_BASE}/test-vote`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ poll_id: pollId, choice, voter_token: voterToken })
+              });
+              
+              if (!voteRes.ok) {
+                const err = await voteRes.json();
+                throw new Error(err.message);
+              }
+              
+              voteSection.classList.add("hidden");
+              resultSection.classList.remove("hidden");
+              await renderResults(true);
+            } catch (error) {
+              alert(error.message);
+            }
+          });
+        });
+
+      } catch (error) {
+        title.textContent = "Fehler";
+        question.textContent = error.message;
+        voteSection.classList.add("hidden");
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", initTestPoll);
+  </script>
+</body>
+</html>

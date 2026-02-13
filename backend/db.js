@@ -53,6 +53,7 @@ async function initDatabase() {
       title TEXT NOT NULL,
       question TEXT,
       active INTEGER NOT NULL DEFAULT 1,
+      is_test INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
     )
   `);
@@ -68,9 +69,21 @@ async function initDatabase() {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS test_votes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      poll_id TEXT NOT NULL,
+      voter_token TEXT NOT NULL,
+      choice TEXT NOT NULL CHECK(choice IN ('yes', 'no')),
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      UNIQUE(poll_id, voter_token)
+    )
+  `);
+
   // Indizes
   db.run(`CREATE INDEX IF NOT EXISTS idx_votes_poll ON votes(poll_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_votes_user ON votes(user_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_test_votes_poll ON test_votes(poll_id)`);
 
   // Speichern
   saveDatabase();
@@ -177,20 +190,37 @@ function updatePassword(email, newPasswordHash) {
 
 // ==================== Poll-Funktionen ====================
 
-function getAllPolls() {
-  const result = db.exec('SELECT id, title, question, active FROM polls ORDER BY created_at DESC');
+function getAllPolls(includeTest = false) {
+  const query = includeTest 
+    ? 'SELECT id, title, question, active, is_test FROM polls ORDER BY created_at DESC'
+    : 'SELECT id, title, question, active, is_test FROM polls WHERE is_test = 0 ORDER BY created_at DESC';
+  const result = db.exec(query);
   if (!result.length) return [];
   
   return result[0].values.map(row => ({
     id: row[0],
     title: row[1],
     question: row[2],
-    active: row[3]
+    active: row[3],
+    is_test: row[4]
+  }));
+}
+
+function getTestPolls() {
+  const result = db.exec('SELECT id, title, question, active, is_test FROM polls WHERE is_test = 1 ORDER BY created_at DESC');
+  if (!result.length) return [];
+  
+  return result[0].values.map(row => ({
+    id: row[0],
+    title: row[1],
+    question: row[2],
+    active: row[3],
+    is_test: row[4]
   }));
 }
 
 function getPollById(id) {
-  const stmt = db.prepare('SELECT id, title, question, active, created_at FROM polls WHERE id = ?');
+  const stmt = db.prepare('SELECT id, title, question, active, is_test, created_at FROM polls WHERE id = ?');
   stmt.bind([id]);
   
   if (stmt.step()) {
@@ -202,9 +232,9 @@ function getPollById(id) {
   return null;
 }
 
-function createPoll(id, title, question, active) {
-  const stmt = db.prepare('INSERT INTO polls (id, title, question, active) VALUES (?, ?, ?, ?)');
-  stmt.run([id, title, question || null, active ? 1 : 0]);
+function createPoll(id, title, question, active, isTest = false) {
+  const stmt = db.prepare('INSERT INTO polls (id, title, question, active, is_test) VALUES (?, ?, ?, ?, ?)');
+  stmt.run([id, title, question || null, active ? 1 : 0, isTest ? 1 : 0]);
   stmt.free();
   saveDatabase();
 }
@@ -271,6 +301,54 @@ function resetVotes(pollId) {
   saveDatabase();
 }
 
+// ==================== Test-Vote-Funktionen ====================
+
+function createTestVote(pollId, voterToken, choice) {
+  const stmt = db.prepare('INSERT INTO test_votes (poll_id, voter_token, choice) VALUES (?, ?, ?)');
+  stmt.run([pollId, voterToken, choice]);
+  stmt.free();
+  saveDatabase();
+}
+
+function hasTestVoted(pollId, voterToken) {
+  const stmt = db.prepare('SELECT id FROM test_votes WHERE poll_id = ? AND voter_token = ?');
+  stmt.bind([pollId, voterToken]);
+  const hasVote = stmt.step();
+  stmt.free();
+  return hasVote;
+}
+
+function getTestResults(pollId) {
+  const stmt = db.prepare(`
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN choice = 'yes' THEN 1 ELSE 0 END) as yes,
+      SUM(CASE WHEN choice = 'no' THEN 1 ELSE 0 END) as no
+    FROM test_votes 
+    WHERE poll_id = ?
+  `);
+  stmt.bind([pollId]);
+  
+  if (stmt.step()) {
+    const row = stmt.getAsObject();
+    stmt.free();
+    return {
+      total: row.total || 0,
+      yes: row.yes || 0,
+      no: row.no || 0
+    };
+  }
+  stmt.free();
+  return { total: 0, yes: 0, no: 0 };
+}
+
+function resetTestVotes(pollId) {
+  const stmt = db.prepare('DELETE FROM test_votes WHERE poll_id = ?');
+  stmt.run([pollId]);
+  stmt.free();
+  saveDatabase();
+}
+
 // Exportieren
 module.exports = {
   initDatabase,
@@ -285,6 +363,7 @@ module.exports = {
   updatePassword,
   // Polls
   getAllPolls,
+  getTestPolls,
   getPollById,
   createPoll,
   updatePoll,
@@ -293,5 +372,10 @@ module.exports = {
   createVote,
   hasUserVoted,
   getResults,
-  resetVotes
+  resetVotes,
+  // Test Votes
+  createTestVote,
+  hasTestVoted,
+  getTestResults,
+  resetTestVotes
 };

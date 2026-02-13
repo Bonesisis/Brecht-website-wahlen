@@ -123,7 +123,7 @@ const api = {
   },
 
   // Admin (mit Admin-Code Header)
-  async createPoll(title, question, adminCode) {
+  async createPoll(title, question, adminCode, isTest = false) {
     if (USE_MOCK) {
       const polls = loadPolls();
       const payload = {
@@ -131,6 +131,7 @@ const api = {
         title,
         question,
         active: true,
+        is_test: isTest,
         createdAt: new Date().toISOString(),
         votes: { yes: [], no: [] }
       };
@@ -144,10 +145,26 @@ const api = {
         "Content-Type": "application/json",
         "X-Admin-Code": adminCode
       },
-      body: JSON.stringify({ title, question })
+      body: JSON.stringify({ title, question, is_test: isTest })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Erstellen fehlgeschlagen");
+    return data;
+  },
+
+  async getTestPolls(adminCode) {
+    const res = await fetch(`${API_BASE}/admin/test-polls`, {
+      headers: { "X-Admin-Code": adminCode }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Laden fehlgeschlagen");
+    return data;
+  },
+
+  async getTestResults(pollId) {
+    const res = await fetch(`${API_BASE}/test-results?poll_id=${pollId}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Ergebnisse fehlgeschlagen");
     return data;
   },
 
@@ -662,9 +679,11 @@ async function initVote() {
 // ==================== Page: Admin ====================
 async function initAdmin() {
   const list = document.querySelector("[data-admin-list]");
+  const testList = document.querySelector("[data-test-poll-list]");
   const form = document.querySelector("[data-admin-form]");
   const titleInput = document.querySelector("[data-admin-title]");
   const questionInput = document.querySelector("[data-admin-question]");
+  const isTestCheckbox = document.querySelector("[data-admin-is-test]");
   const adminCodeInput = document.querySelector("[data-admin-code]");
   const container = document.querySelector(".container");
 
@@ -731,26 +750,116 @@ async function initAdmin() {
     }
   };
 
+  const renderTestPolls = async () => {
+    if (!testList) return;
+    
+    try {
+      const adminCode = prompt("Admin-Code für Test-Abstimmungen:");
+      if (!adminCode) {
+        testList.innerHTML = '<div class="card card--soft"><p class="mb-0">Admin-Code erforderlich</p></div>';
+        return;
+      }
+      
+      const polls = await api.getTestPolls(adminCode);
+      testList.innerHTML = "";
+      
+      if (!polls.length) {
+        testList.innerHTML = '<div class="card card--soft"><p class="mb-0">Keine Test-Abstimmungen vorhanden</p></div>';
+        return;
+      }
+      
+      for (const poll of polls) {
+        let results = { yes: 0, no: 0, total: 0 };
+        try {
+          results = await api.getTestResults(poll.id);
+        } catch (e) { /* ignore */ }
+        
+        const testUrl = `${window.location.origin}/tp.html?id=${poll.id}`;
+        
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="poll-card__header">
+            <div>
+              <h3 class="poll-card__title">${poll.title}</h3>
+              ${poll.question ? `<p class="text-small text-muted">${poll.question}</p>` : ''}
+            </div>
+            <span class="badge ${poll.active ? "badge--active" : "badge--closed"}">
+              ${poll.active ? "Aktiv" : "Geschlossen"}
+            </span>
+          </div>
+          <div class="text-small text-muted mt-2">${results.total} Stimmen</div>
+          <div class="mt-2">
+            <label class="text-small">Versteckter Link:</label>
+            <input type="text" class="input input--small" value="${testUrl}" readonly onclick="this.select()" />
+          </div>
+          <div class="grid grid--2 mt-3">
+            <button class="button button--secondary button--small" data-action="toggle" data-id="${poll.id}" data-test="true">
+              ${poll.active ? "Deaktivieren" : "Aktivieren"}
+            </button>
+            <button class="button button--ghost button--small" data-action="delete" data-id="${poll.id}" data-test="true">Löschen</button>
+          </div>
+        `;
+        testList.appendChild(card);
+      }
+      
+      testList.querySelectorAll("button[data-action]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = button.dataset.id;
+          const action = button.dataset.action;
+          
+          const code = prompt("Bitte Admin-Code eingeben:");
+          if (!code) return;
+
+          try {
+            if (action === "toggle") {
+              const poll = await api.getPoll(id);
+              if (!poll) return;
+              await api.updatePoll(id, { active: !poll.active }, code);
+            }
+            if (action === "delete") {
+              if (!confirm("Test-Abstimmung wirklich löschen?")) return;
+              await api.deletePoll(id, code);
+            }
+            renderTestPolls();
+          } catch (error) {
+            showAlert(container, error.message);
+          }
+        });
+      });
+    } catch (error) {
+      testList.innerHTML = '<div class="alert alert--error">Fehler beim Laden der Test-Abstimmungen</div>';
+    }
+  };
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const title = titleInput.value.trim();
     const question = questionInput ? questionInput.value.trim() : "";
+    const isTest = isTestCheckbox ? isTestCheckbox.checked : false;
     if (!title) return;
 
     const adminCode = prompt("Bitte Admin-Code eingeben:");
     if (!adminCode) return;
 
     try {
-      await api.createPoll(title, question, adminCode);
+      await api.createPoll(title, question, adminCode, isTest);
       titleInput.value = "";
       if (questionInput) questionInput.value = "";
-      render();
+      if (isTestCheckbox) isTestCheckbox.checked = false;
+      
+      if (isTest) {
+        renderTestPolls();
+      } else {
+        render();
+      }
     } catch (error) {
       showAlert(container, error.message);
     }
   });
 
   render();
+  renderTestPolls();
 }
 
 // ==================== Logout Handler ====================

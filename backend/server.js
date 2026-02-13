@@ -515,7 +515,195 @@ app.get('/api/results', (req, res) => {
   }
 });
 
+// ==================== Test-Poll Endpoints (ohne Auth) ====================
+
+/**
+ * GET /api/test-poll/:id
+ * Test-Abstimmung abrufen (keine Auth nötig)
+ */
+app.get('/api/test-poll/:id', (req, res) => {
+  try {
+    const poll = db.getPollById(req.params.id);
+    
+    if (!poll || poll.is_test !== 1) {
+      return res.status(404).json({ 
+        error: 'Nicht gefunden',
+        message: 'Test-Abstimmung existiert nicht' 
+      });
+    }
+
+    res.json({
+      ...poll,
+      active: poll.active === 1,
+      is_test: true
+    });
+  } catch (error) {
+    console.error('Test-Poll-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Test-Abstimmung konnte nicht geladen werden' 
+    });
+  }
+});
+
+/**
+ * POST /api/test-vote
+ * Bei Test-Abstimmung abstimmen (keine Auth, Cookie-basiert)
+ */
+app.post('/api/test-vote', (req, res) => {
+  try {
+    const { poll_id, choice, voter_token } = req.body;
+
+    // Validierung
+    if (!poll_id || !choice || !voter_token) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'poll_id, choice und voter_token sind erforderlich' 
+      });
+    }
+
+    if (!['yes', 'no'].includes(choice)) {
+      return res.status(400).json({ 
+        error: 'Ungültige Wahl',
+        message: 'choice muss "yes" oder "no" sein' 
+      });
+    }
+
+    // Poll prüfen
+    const poll = db.getPollById(poll_id);
+    if (!poll || poll.is_test !== 1) {
+      return res.status(404).json({ 
+        error: 'Nicht gefunden',
+        message: 'Test-Abstimmung existiert nicht' 
+      });
+    }
+
+    if (poll.active !== 1) {
+      return res.status(400).json({ 
+        error: 'Geschlossen',
+        message: 'Diese Abstimmung ist beendet' 
+      });
+    }
+
+    // Prüfen ob bereits abgestimmt
+    if (db.hasTestVoted(poll_id, voter_token)) {
+      return res.status(400).json({ 
+        error: 'Bereits abgestimmt',
+        message: 'Du hast bereits abgestimmt' 
+      });
+    }
+
+    // Stimme speichern
+    db.createTestVote(poll_id, voter_token, choice);
+
+    res.json({
+      message: 'Stimme erfolgreich abgegeben',
+      choice
+    });
+
+  } catch (error) {
+    console.error('Test-Vote-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Abstimmung fehlgeschlagen' 
+    });
+  }
+});
+
+/**
+ * GET /api/test-results
+ * Ergebnisse für Test-Abstimmung abrufen
+ */
+app.get('/api/test-results', (req, res) => {
+  try {
+    const { poll_id } = req.query;
+
+    if (!poll_id) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'poll_id ist erforderlich' 
+      });
+    }
+
+    const poll = db.getPollById(poll_id);
+    if (!poll || poll.is_test !== 1) {
+      return res.status(404).json({ 
+        error: 'Nicht gefunden',
+        message: 'Test-Abstimmung existiert nicht' 
+      });
+    }
+
+    const results = db.getTestResults(poll_id);
+
+    res.json({
+      poll_id,
+      total: results.total || 0,
+      yes: results.yes || 0,
+      no: results.no || 0
+    });
+
+  } catch (error) {
+    console.error('Test-Results-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Ergebnisse konnten nicht geladen werden' 
+    });
+  }
+});
+
+/**
+ * GET /api/test-hasvoted
+ * Prüfen ob bei Test-Abstimmung bereits abgestimmt
+ */
+app.get('/api/test-hasvoted', (req, res) => {
+  try {
+    const { poll_id, voter_token } = req.query;
+
+    if (!poll_id || !voter_token) {
+      return res.status(400).json({ 
+        error: 'Fehlende Daten',
+        message: 'poll_id und voter_token sind erforderlich' 
+      });
+    }
+
+    const hasVoted = db.hasTestVoted(poll_id, voter_token);
+
+    res.json({ hasVoted });
+
+  } catch (error) {
+    console.error('Test-HasVoted-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Prüfung fehlgeschlagen' 
+    });
+  }
+});
+
 // ==================== Admin Endpoints ====================
+
+/**
+ * GET /api/admin/test-polls
+ * Alle Test-Abstimmungen abrufen (Admin)
+ */
+app.get('/api/admin/test-polls', auth.adminRequired, (req, res) => {
+  try {
+    const polls = db.getTestPolls();
+    
+    const formattedPolls = polls.map(poll => ({
+      ...poll,
+      active: poll.active === 1,
+      is_test: poll.is_test === 1
+    }));
+
+    res.json(formattedPolls);
+  } catch (error) {
+    console.error('Admin Test-Polls-Fehler:', error);
+    res.status(500).json({ 
+      error: 'Serverfehler',
+      message: 'Test-Abstimmungen konnten nicht geladen werden' 
+    });
+  }
+});
 
 /**
  * POST /api/admin/polls
@@ -523,7 +711,7 @@ app.get('/api/results', (req, res) => {
  */
 app.post('/api/admin/polls', auth.adminRequired, (req, res) => {
   try {
-    const { title, active = true } = req.body;
+    const { title, question, active = true, is_test = false } = req.body;
 
     if (!title || title.trim().length === 0) {
       return res.status(400).json({ 
@@ -533,7 +721,7 @@ app.post('/api/admin/polls', auth.adminRequired, (req, res) => {
     }
 
     const pollId = uuidv4();
-    db.createPoll(pollId, title.trim(), active);
+    db.createPoll(pollId, title.trim(), question ? question.trim() : null, active, is_test);
 
     const poll = db.getPollById(pollId);
 
@@ -541,7 +729,8 @@ app.post('/api/admin/polls', auth.adminRequired, (req, res) => {
       message: 'Abstimmung erstellt',
       poll: {
         ...poll,
-        active: poll.active === 1
+        active: poll.active === 1,
+        is_test: poll.is_test === 1
       }
     });
 
